@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAP-C02 クイズ</title>
+<style>
+:root{--fs:13px}
+body{font-family:system-ui,sans-serif;font-size:var(--fs);max-width:1400px;width:96%;margin:0 auto;padding:8px 16px;line-height:1.5;background:#fafafa;color:#222}
+header{position:sticky;top:0;z-index:5;background:#fafafa;padding:8px 0;border-bottom:1px solid #ddd;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0}
+button,select,input{font-size:13px;padding:4px 8px}
+button.main{background:#06c;color:#fff;border:0;border-radius:4px;cursor:pointer}
+button.sub{cursor:pointer}
+.q{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 14px;white-space:pre-wrap}
+.c{display:block;margin:5px 0;padding:6px 10px;border:1px solid #ccc;border-radius:6px;cursor:pointer;background:#fff;white-space:pre-wrap}
+.c.sel{border-color:#06c;background:#eef5ff}
+.c.ok{border-color:#2a2;background:#e8f8e8}
+.c.ng{border-color:#c33;background:#fdeaea}
+.exp{margin-top:8px;padding:8px 12px;background:#f3f3f3;border-radius:6px;white-space:pre-wrap;word-break:break-all}
+img{max-width:100%;height:auto;margin-top:8px}
+.stat{margin-left:auto;font-size:13px}
+table.rep{border-collapse:collapse;margin-top:12px;white-space:normal}
+table.rep th,table.rep td{border:1px solid #ccc;padding:6px 12px;text-align:right}
+table.rep th:first-child,table.rep td:first-child{text-align:left}
+.msg{font-weight:bold;padding:2px 10px;border-radius:4px;white-space:normal;word-break:break-all;max-width:100%}
+.hint{margin:8px 0;padding:8px 12px;background:#fff3b0;border:1px solid #e0b800;border-radius:6px;font-size:1.25em;font-weight:bold;color:#443}
+mark{background:#ffe14d;color:inherit;padding:0 1px;border-radius:2px}
+.msg{display:inline-flex;flex-wrap:wrap;align-items:flex-start}
+.msg .ml{flex:0 0 34em;width:34em;max-width:100%;box-sizing:border-box;display:block;word-break:break-all}
+.msg .mh{flex:1 1 3em;min-width:0;padding-left:3em}
+.msg.ok{background:#e8f8e8;color:#161;border:1px solid #2a2}
+.msg.ng{background:#fdeaea;color:#a22;border:1px solid #c33}
+.msg.info{background:#fff3cd;color:#664;border:1px solid #dc8}
+.qh{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px 8px;white-space:normal}
+.qh .badge{margin-left:auto;text-align:right}
+.badge{background:#fe9;padding:2px 8px;border-radius:10px;font-size:13px}
+.msg{max-width:100%;box-sizing:border-box}
+.msg .mh{white-space:normal;overflow-wrap:anywhere}
+.hint{white-space:normal;overflow-wrap:anywhere}
+.row>*{max-width:100%}
+select{min-width:0}
+@media (min-width:901px){
+.msg{flex-wrap:nowrap}
+.msg .mh{flex:1 1 auto}
+}
+@media (max-width:900px){
+body{box-sizing:border-box}
+header{position:static}
+.msg{display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;flex:1 1 100%}
+.msg .ml{flex:0 0 auto;width:auto}
+.msg .mh{flex:0 0 auto;padding-left:0;margin-top:2px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <select id="mode"><option value="todo">未正解のみ(正解済みスキップ)</option><option value="seq">全問・順番</option><option value="rand">ランダム</option><option value="wrong">間違えた問題のみ</option></select>
+    <select id="cat"></select>
+    <input id="jump" type="number" min="1" placeholder="問題番号" style="width:100px">
+    <button id="go" class="sub">移動</button>
+    <button id="report" class="sub">成績</button>
+    <button id="reset" class="sub">成績リセット</button>
+    <button id="prev" class="sub">◀ 前へ</button>
+    <button id="next" class="sub">次へ ▶</button>
+    <button id="ans" class="main">解答する</button>
+    <button id="peek" class="sub">解説を見る</button>
+    <button id="fsm" class="sub">A−</button><button id="fsp" class="sub">A＋</button>
+    <span id="msg" class="msg"></span>
+    <span class="stat" id="stat"></span>
+  </div>
+</header>
+<div id="app"></div>
+<script src="../questions.js"></script>
+<script>
+const Q=window.QUESTIONS;
+let hist={};try{hist=JSON.parse(localStorage.sapc02||'{}')}catch(e){}
+const save=()=>{try{localStorage.sapc02=JSON.stringify(hist)}catch(e){}};
+// idx: 表示中の問題 / pend: 問題no→選択キー配列(未採点, メモリのみ) / graded: 問題no→選択キー配列(この操作で採点済み, メモリのみ)
+let idx=0,peekMode=false,inReport=false,pend={},graded={};
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const imgs=a=>(a||[]).map(s=>`<br><img src="${s}">`).join('');
+const byNo={};Q.forEach(q=>byNo[q.no]=q);
+const selOf=no=>graded[no]||pend[no]||[];
+const isOk=(q,keys)=>{const a=new Set(q.answer);return a.size===keys.length&&keys.every(k=>a.has(k))};
+const hintOf=q=>(q&&typeof q.hint==='string')?q.hint.trim():'';
+const SEP='\u00a0\u00a0\u00a0|\u00a0\u00a0\u00a0'; // 区切り前後を広く空ける(nbsp)
+// 正解選択肢の本文を escape しつつ、ヒントの各語句(「/」「+」区切り)に一致する部分を <mark> で囲む
+function hl(text,hint){
+  const parts=hint?hint.split(/[\/+]/).map(x=>x.trim()).filter(Boolean):[];
+  const rg=[];
+  parts.forEach(p=>{let i=text.indexOf(p);while(i>=0){rg.push([i,i+p.length]);i=text.indexOf(p,i+p.length)}});
+  if(!rg.length)return esc(text);
+  rg.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+  const m=[];rg.forEach(r=>{const l=m[m.length-1];if(l&&r[0]<=l[1])l[1]=Math.max(l[1],r[1]);else m.push([r[0],r[1]])});
+  let o='',p=0;m.forEach(([a,b])=>{o+=esc(text.slice(p,a))+'<mark>'+esc(text.slice(a,b))+'</mark>';p=b});
+  return o+esc(text.slice(p));
+}
+const touched=no=>!!(pend[no]||graded[no]);
+
+const tags={};Q.forEach(q=>tags[q.category]=(tags[q.category]||0)+1);
+$('cat').innerHTML=`<option value="">全カテゴリ(${Q.length})</option>`+Object.entries(tags).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`<option value="${t}">${t} (${n})</option>`).join('');
+function pool(){const m=$('mode').value,c=$('cat').value;
+  return Q.map((_,i)=>i).filter(i=>{const no=Q[i].no;
+    if(c&&Q[i].category!==c)return false;
+    if(m==='wrong')return hist[no]===false;
+    if(m==='seq')return true;
+    if(m==='todo')return hist[no]!==true||touched(no); // 今セッションで選択/採点した問題は、正解済みでも出題範囲に残す
+    return hist[no]!==true})}
+function showReport(){
+  const rows=Object.entries(tags).sort((a,b)=>b[1]-a[1]).map(([t,n])=>{
+    const qs=Q.filter(q=>q.category===t),ans=qs.filter(q=>q.no in hist).length,ok=qs.filter(q=>hist[q.no]===true).length;
+    return `<tr><td>${t}</td><td>${n}</td><td>${ans}</td><td>${ok}</td><td>${(ok/n*100).toFixed(1)}%</td><td>${ans?Math.round(ok/ans*100)+'%':'-'}</td><td>${n-ok}</td></tr>`}).join('');
+  const all=Object.values(hist),ok=all.filter(x=>x).length;
+  $('app').innerHTML=`<div class="q"><b>成績</b>\n全体: 回答 ${all.length}/${Q.length}、正解 ${ok}、正解率 ${(ok/Q.length*100).toFixed(1)}%(正解数÷全${Q.length}問)、回答済みに対する正解率 ${all.length?Math.round(ok/all.length*100):0}%
+<table class="rep"><tr><th>カテゴリ</th><th>問題数</th><th>回答済</th><th>正解</th><th>正解率<br>(正解÷問題数)</th><th>回答済み比<br>(正解÷回答済)</th><th>未正解(残り)</th></tr>${rows}</table>
+※ 同じ問題を解き直した場合は最新の結果で数えます。</div>`;
+  inReport=true;
+}
+function stat(){const v=Object.values(hist);$('stat').textContent=`回答 ${v.length}/${Q.length} 正解 ${v.filter(x=>x).length}`}
+function setMsg(t,cls,hint){const m=$('msg');m.className='msg'+(cls?' '+cls:'');m.textContent='';
+  if(!t&&!hint)return;
+  const l=document.createElement('span');l.className='ml';
+  const tx=document.createElement('span');tx.textContent=t;l.appendChild(tx);
+  m.appendChild(l);
+  if(hint){const h=document.createElement('span');h.className='mh';h.textContent=hint;m.appendChild(h)}}
+
+// 選択肢の見た目: 採点済み or 解説表示中なら ok/ng の色、そうでなければ選択(青)のみ
+function paint(){
+  const q=Q[idx],no=q.no,show=!!graded[no]||peekMode,s=new Set(selOf(no)),a=new Set(q.answer);
+  const h=hintOf(q);
+  document.querySelectorAll('.c').forEach(e=>{const k=e.dataset.k;
+    const ct=e.querySelector('.ct'),c=q.choices.find(x=>x.key===k);
+    if(ct&&c)ct.innerHTML=(show&&a.has(k)&&h)?hl(c.text,h):esc(c.text);
+    e.classList.remove('sel','ok','ng');
+    if(show){if(a.has(k))e.classList.add('ok');else if(s.has(k))e.classList.add('ng')}
+    else if(s.has(k))e.classList.add('sel')});
+}
+// 色・解説・#msg を表示(採点済みなら判定つき、未採点の解説表示中は「正解: X」のみ)
+function reveal(){
+  const q=Q[idx],no=q.no,g=graded[no],judged=!!g,ok=judged&&isOk(q,g),ans=q.answer.join(', ');
+  paint();$('peek').textContent='解説を隠す';
+  setMsg((judged?(ok?'正解! ':'不正解 ')+'正解: '+ans:'正解: '+ans),judged?(ok?'ok':'ng'):'info',hintOf(q));
+  $('res').innerHTML=(hintOf(q)?`<div class="hint">覚え方: ${esc(hintOf(q))}</div>`:'')+(judged?`<p><b>${ok?'正解!':'不正解'}</b> 正解: ${ans}</p>`:`<p>正解: ${ans}</p>`)+(q.explanation?`<div class="exp">${esc(q.explanation)}</div>`:'');
+}
+// 現在の問題の表示状態を状態(pend/graded/peekMode)から作り直す
+function refresh(){
+  if(graded[Q[idx].no]||peekMode){reveal();return}
+  paint();$('res').innerHTML='';setMsg('');$('peek').textContent='解説を見る';
+}
+function render(keepScroll){
+  inReport=false;
+  const q=Q[idx],multi=q.answer.length>1;
+  $('app').innerHTML=`<div class="q"><div class="qh"><span class="qn"><b>NO.${q.no}/${Q.length}</b>${multi?` (${q.answer.length}つ選択)`:''}</span><span class="badge">${q.category}</span></div>\n${esc(q.question)}${imgs(q.images)}</div>`+
+   q.choices.map(c=>`<label class="c" data-k="${c.key}"><b>${c.key}.</b> <span class="ct">${esc(c.text)}</span>${imgs(c.images)}</label>`).join('')+`<div id="res"></div>`;
+  document.querySelectorAll('.c').forEach(el=>el.onclick=()=>{
+    if(graded[q.no])return; // 採点済みは「解説を隠す」で解除するまで変更不可
+    const k=el.dataset.k,s=new Set(pend[q.no]||[]);
+    if(multi){s.has(k)?s.delete(k):s.add(k)}else{s.clear();s.add(k)}
+    if(s.size)pend[q.no]=[...s].sort();else delete pend[q.no];
+    if(peekMode)reveal();else paint()});
+  refresh();
+  if(!keepScroll)window.scrollTo(0,0);
+}
+
+// 解答する: 「選択済みで未採点の全問題」をまとめて採点して成績に記録。現在の問題が未選択でも押せる
+$('ans').onclick=()=>{
+  if(inReport)render(true);
+  const targets=Object.keys(pend).filter(no=>!graded[no]&&pend[no].length&&byNo[no]);
+  let okN=0,ngN=0;
+  targets.forEach(no=>{const q=byNo[no],keys=pend[no],ok=isOk(q,keys);
+    hist[q.no]=ok;graded[no]=keys;delete pend[no];ok?okN++:ngN++});
+  if(targets.length){save();stat()}
+  refresh();
+  const q=Q[idx],g=graded[q.no],n=targets.length,ans=q.answer.join(', ');
+  if(g){
+    const ok=isOk(q,g),judge=(ok?'正解! ':'不正解 ')+'正解: '+ans;
+    setMsg(`今回 ${n}問採点${n?`: ${okN}問正解 / ${ngN}問不正解`:'(新たに選択した問題なし)'}${SEP}${judge}`,ok?'ok':'ng',hintOf(q));
+  }else if(n){
+    setMsg(`今回 ${n}問採点: ${okN}問正解 / ${ngN}問不正解${SEP}この問題は未選択のため採点していません。正解: ${ans}`,'info',hintOf(q));
+  }else{
+    setMsg('選択済みの問題がありません','info');
+  }
+};
+// 解説を見る/隠す: 成績には記録しない(カンニング可)。隠すと採点済み状態も解除して未回答表示に戻る(hist は再採点まで残す)
+$('peek').onclick=()=>{
+  if(inReport)render(true);
+  const no=Q[idx].no;
+  if(peekMode||graded[no]){
+    peekMode=false;
+    if(graded[no]){pend[no]=graded[no];delete graded[no]}
+    refresh();
+  }else{peekMode=true;reveal()}
+};
+
+function step(d){
+  const m=$('mode').value;
+  const p=pool();if(!p.length){$('app').textContent='該当する問題がありません';inReport=false;return}
+  if(m==='rand'){idx=p[Math.floor(Math.random()*p.length)]}
+  else{let n=d>0?p.find(i=>i>idx):[...p].reverse().find(i=>i<idx);if(n===undefined)n=d>0?p[0]:p[p.length-1];idx=n}
+  render();
+}
+$('next').onclick=()=>step(1);$('prev').onclick=()=>step(-1);
+let fs=13;try{fs=+localStorage.sapc02fs2||13}catch(e){}
+const setFs=n=>{fs=Math.min(22,Math.max(8,n));document.documentElement.style.setProperty('--fs',fs+'px');try{localStorage.sapc02fs2=fs}catch(e){}};
+setFs(fs);$('fsm').onclick=()=>setFs(fs-1);$('fsp').onclick=()=>setFs(fs+1);
+$('report').onclick=showReport;
+$('go').onclick=()=>{const n=+$('jump').value,i=Q.findIndex(q=>q.no===n);if(i>=0){idx=i;render()}};
+$('reset').onclick=()=>{if(confirm('成績をリセットしますか?')){hist={};pend={};graded={};save();stat();if(inReport)showReport();else if($('app').querySelector('.c'))render(true)}};
+$('mode').onchange=$('cat').onchange=()=>{idx=-1;step(1)};
+stat();idx=-1;step(1);
+</script>
+<script>document.getElementById("peek").click()</script>
+</body>
+</html>
