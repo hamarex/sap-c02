@@ -50,6 +50,8 @@ header{position:static}
 .msg{display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;flex:1 1 100%}
 .msg .ml{flex:0 0 auto;width:auto}
 .msg .mh{flex:0 0 auto;padding-left:0;margin-top:2px}
+.msg .ml:empty{display:none}
+.msg .ml:empty+.mh{margin-top:0}
 }
 </style>
 </head>
@@ -123,7 +125,7 @@ function stat(){const v=Object.values(hist);$('stat').textContent=`回答 ${v.le
 function setMsg(t,cls,hint){const m=$('msg');m.className='msg'+(cls?' '+cls:'');m.textContent='';
   if(!t&&!hint)return;
   const l=document.createElement('span');l.className='ml';
-  const tx=document.createElement('span');tx.textContent=t;l.appendChild(tx);
+  if(t){const tx=document.createElement('span');tx.textContent=t;l.appendChild(tx)}
   m.appendChild(l);
   if(hint){const h=document.createElement('span');h.className='mh';h.textContent=hint;m.appendChild(h)}}
 
@@ -142,7 +144,7 @@ function paint(){
 function reveal(){
   const q=Q[idx],no=q.no,g=graded[no],judged=!!g,ok=judged&&isOk(q,g),ans=q.answer.join(', ');
   paint();$('peek').textContent='解説を隠す';
-  setMsg((judged?(ok?'正解! ':'不正解 ')+'正解: '+ans:'正解: '+ans),judged?(ok?'ok':'ng'):'info',hintOf(q));
+  setMsg(judged?(ok?'正解!':'不正解'):'',judged?(ok?'ok':'ng'):'info',hintOf(q));
   $('res').innerHTML=(hintOf(q)?`<div class="hint">覚え方: ${esc(hintOf(q))}</div>`:'')+(judged?`<p><b>${ok?'正解!':'不正解'}</b> 正解: ${ans}</p>`:`<p>正解: ${ans}</p>`)+(q.explanation?`<div class="exp">${esc(q.explanation)}</div>`:'');
 }
 // 現在の問題の表示状態を状態(pend/graded/peekMode)から作り直す
@@ -174,12 +176,12 @@ $('ans').onclick=()=>{
     hist[q.no]=ok;graded[no]=keys;delete pend[no];ok?okN++:ngN++});
   if(targets.length){save();stat()}
   refresh();
-  const q=Q[idx],g=graded[q.no],n=targets.length,ans=q.answer.join(', ');
+  const q=Q[idx],g=graded[q.no],n=targets.length;
   if(g){
-    const ok=isOk(q,g),judge=(ok?'正解! ':'不正解 ')+'正解: '+ans;
+    const ok=isOk(q,g),judge=ok?'正解!':'不正解';
     setMsg(`今回 ${n}問採点${n?`: ${okN}問正解 / ${ngN}問不正解`:'(新たに選択した問題なし)'}${SEP}${judge}`,ok?'ok':'ng',hintOf(q));
   }else if(n){
-    setMsg(`今回 ${n}問採点: ${okN}問正解 / ${ngN}問不正解${SEP}この問題は未選択のため採点していません。正解: ${ans}`,'info',hintOf(q));
+    setMsg(`今回 ${n}問採点: ${okN}問正解 / ${ngN}問不正解${SEP}この問題は未選択のため採点していません`,'info',hintOf(q));
   }else{
     setMsg('選択済みの問題がありません','info');
   }
