@@ -23,10 +23,14 @@ img{max-width:100%;height:auto;margin-top:8px}
 table.rep{border-collapse:collapse;margin-top:12px;white-space:normal}
 table.rep th,table.rep td{border:1px solid #ccc;padding:6px 12px;text-align:right}
 table.rep th:first-child,table.rep td:first-child{text-align:left}
-.msg{font-weight:bold;padding:2px 10px;border-radius:4px}
+.msg{font-weight:bold;padding:2px 10px;border-radius:4px;white-space:normal;word-break:break-all;max-width:100%}
+.hint{margin:8px 0;padding:8px 12px;background:#fff3b0;border:1px solid #e0b800;border-radius:6px;font-size:1.25em;font-weight:bold;color:#443}
+mark{background:#ffe14d;color:inherit;padding:0 1px;border-radius:2px}
 .msg.ok{background:#e8f8e8;color:#161;border:1px solid #2a2}
 .msg.ng{background:#fdeaea;color:#a22;border:1px solid #c33}
 .msg.info{background:#fff3cd;color:#664;border:1px solid #dc8}
+.qh{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px 8px;white-space:normal}
+.qh .badge{margin-left:auto;text-align:right}
 .badge{background:#fe9;padding:2px 8px;border-radius:10px;font-size:13px}
 </style>
 </head>
@@ -62,6 +66,21 @@ const imgs=a=>(a||[]).map(s=>`<br><img src="${s}">`).join('');
 const byNo={};Q.forEach(q=>byNo[q.no]=q);
 const selOf=no=>graded[no]||pend[no]||[];
 const isOk=(q,keys)=>{const a=new Set(q.answer);return a.size===keys.length&&keys.every(k=>a.has(k))};
+const hintOf=q=>(q&&typeof q.hint==='string')?q.hint.trim():'';
+const SEP='\u00a0\u00a0\u00a0|\u00a0\u00a0\u00a0'; // 区切り前後を広く空ける(nbsp)
+const HSEP='\u00a0\u00a0\u00a0|'+'\u00a0'.repeat(24); // 覚え方用: 後ろを広く空ける
+const hintMsg=q=>hintOf(q)?HSEP+hintOf(q):'';
+// 正解選択肢の本文を escape しつつ、ヒントの各語句(「/」「+」区切り)に一致する部分を <mark> で囲む
+function hl(text,hint){
+  const parts=hint?hint.split(/[\/+]/).map(x=>x.trim()).filter(Boolean):[];
+  const rg=[];
+  parts.forEach(p=>{let i=text.indexOf(p);while(i>=0){rg.push([i,i+p.length]);i=text.indexOf(p,i+p.length)}});
+  if(!rg.length)return esc(text);
+  rg.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+  const m=[];rg.forEach(r=>{const l=m[m.length-1];if(l&&r[0]<=l[1])l[1]=Math.max(l[1],r[1]);else m.push([r[0],r[1]])});
+  let o='',p=0;m.forEach(([a,b])=>{o+=esc(text.slice(p,a))+'<mark>'+esc(text.slice(a,b))+'</mark>';p=b});
+  return o+esc(text.slice(p));
+}
 const touched=no=>!!(pend[no]||graded[no]);
 
 const tags={};Q.forEach(q=>tags[q.category]=(tags[q.category]||0)+1);
@@ -89,7 +108,10 @@ function setMsg(t,cls){const m=$('msg');m.textContent=t;m.className='msg'+(cls?'
 // 選択肢の見た目: 採点済み or 解説表示中なら ok/ng の色、そうでなければ選択(青)のみ
 function paint(){
   const q=Q[idx],no=q.no,show=!!graded[no]||peekMode,s=new Set(selOf(no)),a=new Set(q.answer);
+  const h=hintOf(q);
   document.querySelectorAll('.c').forEach(e=>{const k=e.dataset.k;
+    const ct=e.querySelector('.ct'),c=q.choices.find(x=>x.key===k);
+    if(ct&&c)ct.innerHTML=(show&&a.has(k)&&h)?hl(c.text,h):esc(c.text);
     e.classList.remove('sel','ok','ng');
     if(show){if(a.has(k))e.classList.add('ok');else if(s.has(k))e.classList.add('ng')}
     else if(s.has(k))e.classList.add('sel')});
@@ -98,8 +120,8 @@ function paint(){
 function reveal(){
   const q=Q[idx],no=q.no,g=graded[no],judged=!!g,ok=judged&&isOk(q,g),ans=q.answer.join(', ');
   paint();$('peek').textContent='解説を隠す';
-  setMsg(judged?(ok?'⭕ 正解! ':'❌ 不正解 ')+'正解: '+ans:'正解: '+ans,judged?(ok?'ok':'ng'):'info');
-  $('res').innerHTML=(judged?`<p><b>${ok?'正解!':'不正解'}</b> 正解: ${ans}</p>`:`<p>正解: ${ans}</p>`)+(q.explanation?`<div class="exp">${esc(q.explanation)}</div>`:'');
+  setMsg((judged?(ok?'正解! ':'不正解 ')+'正解: '+ans:'正解: '+ans)+hintMsg(q),judged?(ok?'ok':'ng'):'info');
+  $('res').innerHTML=(hintOf(q)?`<div class="hint">覚え方: ${esc(hintOf(q))}</div>`:'')+(judged?`<p><b>${ok?'正解!':'不正解'}</b> 正解: ${ans}</p>`:`<p>正解: ${ans}</p>`)+(q.explanation?`<div class="exp">${esc(q.explanation)}</div>`:'');
 }
 // 現在の問題の表示状態を状態(pend/graded/peekMode)から作り直す
 function refresh(){
@@ -109,8 +131,8 @@ function refresh(){
 function render(keepScroll){
   inReport=false;
   const q=Q[idx],multi=q.answer.length>1;
-  $('app').innerHTML=`<div class="q"><b>NO.${q.no}/${Q.length}</b> <span class="badge">${q.category}</span>${multi?` (${q.answer.length}つ選択)`:''}\n\n${esc(q.question)}${imgs(q.images)}</div>`+
-   q.choices.map(c=>`<label class="c" data-k="${c.key}"><b>${c.key}.</b> ${esc(c.text)}${imgs(c.images)}</label>`).join('')+`<div id="res"></div>`;
+  $('app').innerHTML=`<div class="q"><div class="qh"><span class="qn"><b>NO.${q.no}/${Q.length}</b>${multi?` (${q.answer.length}つ選択)`:''}</span><span class="badge">${q.category}</span></div>\n${esc(q.question)}${imgs(q.images)}</div>`+
+   q.choices.map(c=>`<label class="c" data-k="${c.key}"><b>${c.key}.</b> <span class="ct">${esc(c.text)}</span>${imgs(c.images)}</label>`).join('')+`<div id="res"></div>`;
   document.querySelectorAll('.c').forEach(el=>el.onclick=()=>{
     if(graded[q.no])return; // 採点済みは「解説を隠す」で解除するまで変更不可
     const k=el.dataset.k,s=new Set(pend[q.no]||[]);
@@ -132,10 +154,10 @@ $('ans').onclick=()=>{
   refresh();
   const q=Q[idx],g=graded[q.no],n=targets.length,ans=q.answer.join(', ');
   if(g){
-    const ok=isOk(q,g),judge=(ok?'⭕ 正解! ':'❌ 不正解 ')+'正解: '+ans;
-    setMsg(`今回 ${n}問採点${n?`: ${okN}問正解 / ${ngN}問不正解`:'(新たに選択した問題なし)'} | ${judge}`,ok?'ok':'ng');
+    const ok=isOk(q,g),judge=(ok?'正解! ':'不正解 ')+'正解: '+ans;
+    setMsg(`今回 ${n}問採点${n?`: ${okN}問正解 / ${ngN}問不正解`:'(新たに選択した問題なし)'}${SEP}${judge}${hintMsg(q)}`,ok?'ok':'ng');
   }else if(n){
-    setMsg(`今回 ${n}問採点: ${okN}問正解 / ${ngN}問不正解 | この問題は未選択のため採点していません 正解: ${ans}`,'info');
+    setMsg(`今回 ${n}問採点: ${okN}問正解 / ${ngN}問不正解${SEP}この問題は未選択のため採点していません。正解: ${ans}${hintMsg(q)}`,'info');
   }else{
     setMsg('選択済みの問題がありません','info');
   }
