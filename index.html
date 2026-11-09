@@ -26,6 +26,9 @@ table.rep th:first-child,table.rep td:first-child{text-align:left}
 .msg{font-weight:bold;padding:2px 10px;border-radius:4px;white-space:normal;word-break:break-all;max-width:100%}
 .hint{margin:8px 0;padding:8px 12px;background:#fff3b0;border:1px solid #e0b800;border-radius:6px;font-size:1.25em;font-weight:bold;color:#443}
 mark{background:#ffe14d;color:inherit;padding:0 1px;border-radius:2px}
+.msg{display:inline-flex;align-items:flex-start}
+.msg .ml{flex:0 0 34em;width:34em;box-sizing:border-box;display:block;word-break:break-all}
+.msg .mh{flex:1 1 auto;min-width:0;padding-left:3em}
 .msg.ok{background:#e8f8e8;color:#161;border:1px solid #2a2}
 .msg.ng{background:#fdeaea;color:#a22;border:1px solid #c33}
 .msg.info{background:#fff3cd;color:#664;border:1px solid #dc8}
@@ -68,8 +71,6 @@ const selOf=no=>graded[no]||pend[no]||[];
 const isOk=(q,keys)=>{const a=new Set(q.answer);return a.size===keys.length&&keys.every(k=>a.has(k))};
 const hintOf=q=>(q&&typeof q.hint==='string')?q.hint.trim():'';
 const SEP='\u00a0\u00a0\u00a0|\u00a0\u00a0\u00a0'; // 区切り前後を広く空ける(nbsp)
-const HSEP='\u00a0\u00a0\u00a0|'+'\u00a0'.repeat(24); // 覚え方用: 後ろを広く空ける
-const hintMsg=q=>hintOf(q)?HSEP+hintOf(q):'';
 // 正解選択肢の本文を escape しつつ、ヒントの各語句(「/」「+」区切り)に一致する部分を <mark> で囲む
 function hl(text,hint){
   const parts=hint?hint.split(/[\/+]/).map(x=>x.trim()).filter(Boolean):[];
@@ -103,7 +104,12 @@ function showReport(){
   inReport=true;
 }
 function stat(){const v=Object.values(hist);$('stat').textContent=`回答 ${v.length}/${Q.length} 正解 ${v.filter(x=>x).length}`}
-function setMsg(t,cls){const m=$('msg');m.textContent=t;m.className='msg'+(cls?' '+cls:'')}
+function setMsg(t,cls,hint){const m=$('msg');m.className='msg'+(cls?' '+cls:'');m.textContent='';
+  if(!t&&!hint)return;
+  const l=document.createElement('span');l.className='ml';
+  const tx=document.createElement('span');tx.textContent=t;l.appendChild(tx);
+  m.appendChild(l);
+  if(hint){const h=document.createElement('span');h.className='mh';h.textContent=hint;m.appendChild(h)}}
 
 // 選択肢の見た目: 採点済み or 解説表示中なら ok/ng の色、そうでなければ選択(青)のみ
 function paint(){
@@ -120,7 +126,7 @@ function paint(){
 function reveal(){
   const q=Q[idx],no=q.no,g=graded[no],judged=!!g,ok=judged&&isOk(q,g),ans=q.answer.join(', ');
   paint();$('peek').textContent='解説を隠す';
-  setMsg((judged?(ok?'正解! ':'不正解 ')+'正解: '+ans:'正解: '+ans)+hintMsg(q),judged?(ok?'ok':'ng'):'info');
+  setMsg((judged?(ok?'正解! ':'不正解 ')+'正解: '+ans:'正解: '+ans),judged?(ok?'ok':'ng'):'info',hintOf(q));
   $('res').innerHTML=(hintOf(q)?`<div class="hint">覚え方: ${esc(hintOf(q))}</div>`:'')+(judged?`<p><b>${ok?'正解!':'不正解'}</b> 正解: ${ans}</p>`:`<p>正解: ${ans}</p>`)+(q.explanation?`<div class="exp">${esc(q.explanation)}</div>`:'');
 }
 // 現在の問題の表示状態を状態(pend/graded/peekMode)から作り直す
@@ -155,9 +161,9 @@ $('ans').onclick=()=>{
   const q=Q[idx],g=graded[q.no],n=targets.length,ans=q.answer.join(', ');
   if(g){
     const ok=isOk(q,g),judge=(ok?'正解! ':'不正解 ')+'正解: '+ans;
-    setMsg(`今回 ${n}問採点${n?`: ${okN}問正解 / ${ngN}問不正解`:'(新たに選択した問題なし)'}${SEP}${judge}${hintMsg(q)}`,ok?'ok':'ng');
+    setMsg(`今回 ${n}問採点${n?`: ${okN}問正解 / ${ngN}問不正解`:'(新たに選択した問題なし)'}${SEP}${judge}`,ok?'ok':'ng',hintOf(q));
   }else if(n){
-    setMsg(`今回 ${n}問採点: ${okN}問正解 / ${ngN}問不正解${SEP}この問題は未選択のため採点していません。正解: ${ans}${hintMsg(q)}`,'info');
+    setMsg(`今回 ${n}問採点: ${okN}問正解 / ${ngN}問不正解${SEP}この問題は未選択のため採点していません。正解: ${ans}`,'info',hintOf(q));
   }else{
     setMsg('選択済みの問題がありません','info');
   }
