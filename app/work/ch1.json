@@ -1,0 +1,1676 @@
+{
+ "no": 1,
+ "title": "組織の複雑性に対応するソリューション設計",
+ "lessons": [
+  {
+   "id": "1-1",
+   "title": "AWS Organizations と SCP",
+   "pages": [
+    {
+     "id": "1-1-p1",
+     "title": "Organizations の基本構造",
+     "html": "<h4>Organizations とは</h4><ul><li>AWS Organizations：複数のAWSアカウントを一元管理するサービス。管理アカウント（旧マスターアカウント）、メンバーアカウント、OU（組織単位）、ルートで階層を作る</li><li>OUは最大5階層まで入れ子にできる。アカウントは常に1つの親（ルート or OU）にだけ属する</li><li>機能セットは<b class=\"key\">全機能（All features）</b>と一括請求のみ。SCPや委任管理者など統制機能を使うには全機能が必須</li></ul><h4>主な機能</h4><ul><li>一括請求（Consolidated Billing）：全メンバーの料金を管理アカウントへ集約。ボリューム割引、RI/Savings Plansの割引共有が可能</li><li><b class=\"key\">SCP</b>：アカウントが使える権限の上限をガードレールとして設定</li><li>タグポリシー、バックアップポリシー、AIサービスのオプトアウトポリシー等の管理ポリシー</li><li>AWSサービスとの統合（信頼されたアクセス）と<b class=\"key\">委任管理者</b></li></ul><h4>試験の引っ掛け</h4><ul><li><span class=\"trap\">管理アカウントには本番ワークロードを置かない</span>：管理アカウントはSCPの対象外なので、最小限の用途（請求・組織管理）に限る</li><li>新規アカウントは組織内で作成すると<b class=\"key\">OrganizationAccountAccessRole</b>が自動作成され、管理アカウントから引き受けられる（招待で参加したアカウントには自動では作られない）</li></ul>",
+     "oxIds": [
+      "ox-1-1-p1-a",
+      "ox-1-1-p1-b",
+      "ox-1-1-p1-c"
+     ]
+    },
+    {
+     "id": "1-1-p2",
+     "title": "SCP の仕組みと評価ロジック",
+     "html": "<h4>SCPは「許可の上限」</h4><ul><li>SCP（サービスコントロールポリシー）自体は権限を<span class=\"trap\">付与しない</span>。IAMポリシーが許可する範囲に対する<b class=\"key\">最大権限の境界（ガードレール）</b></li><li>実効権限 ＝ <b class=\"key\">SCP ∩ IAM（ID/リソースポリシー・権限境界）</b>。どちらかが拒否・未許可なら不可</li><li>ルート→OU→アカウントの各階層で、すべての階層で許可されているアクションだけが通る</li></ul><h4>拒否リスト方式と許可リスト方式</h4><table><tr><th>方式</th><th>内容</th></tr><tr><td>拒否リスト（deny list）</td><td>デフォルトの <b class=\"key\">FullAWSAccess</b> SCPを残し、禁止したい操作に明示Denyを書く。運用が楽で推奨</td></tr><tr><td>許可リスト（allow list）</td><td>FullAWSAccessを外し、許可するサービスだけをAllowで列挙。厳格だが管理が重い</td></tr></table><h4>重要な適用範囲</h4><ul><li><b class=\"key\">管理アカウントのユーザー/ロールには効かない</b></li><li>メンバーアカウントの<b class=\"key\">ルートユーザーにも効く</b></li><li><b class=\"key\">サービスリンクロール</b>には効かない</li><li>リソースベースポリシーで他アカウントのプリンシパルに付与された権限は、そのプリンシパル側アカウントのSCPで制限される</li></ul>",
+     "oxIds": [
+      "ox-1-1-p2-a",
+      "ox-1-1-p2-b",
+      "ox-1-1-p2-c"
+     ]
+    },
+    {
+     "id": "1-1-p3",
+     "title": "SCP の設計パターンと条件キー",
+     "html": "<h4>典型的なガードレール</h4><ul><li><b class=\"key\">リージョン制限</b>：<b class=\"key\">aws:RequestedRegion</b>条件で許可リージョン以外を拒否。IAM・Organizations・CloudFront・Route 53などグローバルサービスは除外（NotAction）する</li><li>セキュリティサービスの無効化禁止：CloudTrail停止、Config停止、GuardDuty無効化を拒否</li><li>組織からの離脱禁止：organizations:LeaveOrganization を拒否</li><li>ルートユーザー操作禁止：aws:PrincipalArn がルートの場合に拒否</li><li>暗号化必須：暗号化なしのEBS/S3作成を拒否、特定インスタンスタイプ以外の起動を拒否</li><li><b class=\"key\">aws:PrincipalOrgID</b>：リソースポリシーで「自組織内のみ許可」と書く（アカウントID列挙より運用が楽）</li></ul><h4>判断のコツ</h4><ul><li>「個別アカウントに入れ替わり管理者がいても、全員に絶対許さない」→ SCP</li><li>「開発者が自分で作るロールに権限の天井を設けたい」→ <b class=\"key\">IAM権限境界（Permissions Boundary）</b>。SCPは組織側、権限境界はアカウント内の委任管理用</li><li><span class=\"trap\">SCPのDenyは条件付きでも強い</span>：例外が必要なときは条件キーで管理ロールだけ除外する</li></ul>",
+     "oxIds": [
+      "ox-1-1-p3-a",
+      "ox-1-1-p3-b",
+      "ox-1-1-p3-c"
+     ]
+    },
+    {
+     "id": "1-1-p4",
+     "title": "委任管理者・信頼されたアクセス・ポリシー種別",
+     "html": "<h4>委任管理者</h4><ul><li>多くのサービス（GuardDuty、Security Hub、Config、IAM Identity Center、Firewall Manager、CloudFormation StackSets等）は、Organizationsと統合し<b class=\"key\">信頼されたアクセス</b>を有効化した上で<b class=\"key\">委任管理者アカウント</b>を指定できる</li><li>目的：<b class=\"key\">管理アカウントを日常運用から切り離す</b>。セキュリティ専用アカウントなどに管理を移す</li></ul><h4>Organizations の管理ポリシー</h4><table><tr><th>種類</th><th>用途</th></tr><tr><td>SCP</td><td>権限の上限</td></tr><tr><td>タグポリシー</td><td>タグキー・値の標準化（付与の強制ではなく、準拠評価。強制オプションあり）</td></tr><tr><td>バックアップポリシー</td><td>AWS Backupプランを組織全体に適用</td></tr><tr><td>AIサービスオプトアウト</td><td>AIサービスによるコンテンツ利用の拒否</td></tr><tr><td>RCP（リソースコントロールポリシー）</td><td>リソース側の権限上限（データ境界の実装など）</td></tr></table><ul><li><span class=\"trap\">RCPはリソースに対するアクセスの上限</span>を設定。SCPがプリンシパル側、RCPがリソース側と覚える</li></ul>",
+     "oxIds": [
+      "ox-1-1-p4-a",
+      "ox-1-1-p4-b",
+      "ox-1-1-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1-2",
+   "title": "Control Tower とマルチアカウント戦略",
+   "pages": [
+    {
+     "id": "1-2-p1",
+     "title": "なぜマルチアカウントか",
+     "html": "<h4>マルチアカウント戦略の目的</h4><ul><li><b class=\"key\">爆発半径の分離</b>：障害・侵害・誤操作の影響を1アカウントに閉じ込める</li><li><b class=\"key\">サービスクォータの分離</b>：アカウント／リージョン単位のクォータを環境別に確保</li><li><b class=\"key\">コスト可視化</b>：アカウント単位で請求を分離</li><li>権限・コンプライアンス境界：PCI対象環境などを独立させる</li></ul><h4>推奨OU構成（AWS推奨の例）</h4><table><tr><th>OU</th><th>用途</th></tr><tr><td>Security</td><td>ログアーカイブ、セキュリティツール（監査）アカウント</td></tr><tr><td>Infrastructure</td><td>ネットワーク（Transit Gateway等）、共有サービス</td></tr><tr><td>Workloads (Prod / Non-Prod)</td><td>本番／開発のワークロードアカウント</td></tr><tr><td>Sandbox</td><td>実験用。予算上限と厳しいSCP</td></tr><tr><td>Policy Staging / Suspended</td><td>ポリシー検証用／閉鎖予定アカウント</td></tr></table><h4>判断</h4><ul><li>「環境別」ではなく<b class=\"key\">ワークロード別 × 環境別</b>にアカウントを分ける</li><li><span class=\"trap\">単一アカウント内でIAMだけで分離</span>は、爆発半径・クォータ・請求の面で不足と判断される</li></ul>",
+     "oxIds": [
+      "ox-1-2-p1-a",
+      "ox-1-2-p1-b",
+      "ox-1-2-p1-c"
+     ]
+    },
+    {
+     "id": "1-2-p2",
+     "title": "Control Tower のランディングゾーン",
+     "html": "<h4>Control Tower とは</h4><ul><li><b class=\"key\">AWS Control Tower</b>：Organizations、IAM Identity Center、Config、CloudTrail、Service Catalog等を組み合わせ、ベストプラクティス準拠のマルチアカウント環境（ランディングゾーン）を自動構築・運用するサービス</li><li>作成されるもの：Security OU（<b class=\"key\">ログアーカイブアカウント</b>と<b class=\"key\">監査アカウント</b>）、Sandbox OU、組織CloudTrail、Config集約、IAM Identity Centerなど</li><li><b class=\"key\">Account Factory</b>：Service Catalogベースでアカウントを標準化して払い出す。<b class=\"key\">Account Factory for Terraform (AFT)</b>やAccount Factory Customization (AFC)でカスタマイズ可能</li></ul><h4>ガードレール（コントロール）</h4><table><tr><th>種類</th><th>実装</th><th>動き</th></tr><tr><td>予防的</td><td>SCP</td><td>違反操作を拒否</td></tr><tr><td>発見的</td><td>AWS Config ルール</td><td>違反を検出（Dashboardに非準拠表示）</td></tr><tr><td>プロアクティブ</td><td>CloudFormation Hooks</td><td>デプロイ前にテンプレートを検査</td></tr></table><ul><li><span class=\"trap\">予防的=SCP、発見的=Config、プロアクティブ=CFn Hooks</span>は頻出の対応表</li><li>ドリフト検知：ガードレールや構成が手動変更された場合に検出し、修復（再登録・更新）する</li></ul>",
+     "oxIds": [
+      "ox-1-2-p2-a",
+      "ox-1-2-p2-b",
+      "ox-1-2-p2-c"
+     ]
+    },
+    {
+     "id": "1-2-p3",
+     "title": "Control Tower と Organizations の使い分け",
+     "html": "<h4>選択基準</h4><table><tr><th>状況</th><th>選択</th></tr><tr><td>新規にベストプラクティスの環境を素早く作りたい</td><td>Control Tower</td></tr><tr><td>既存のOrganizationsに統制を足したい</td><td>Control Towerで既存OU/アカウントを<b class=\"key\">登録（enroll）</b>、または必要に応じ個別にSCP</td></tr><tr><td>独自の細かいガードレールを自作したい</td><td>Organizations SCP + Config + StackSets を直接構成</td></tr></table><h4>押さえどころ</h4><ul><li>Control Towerは<b class=\"key\">ホームリージョン</b>を持ち、後から変更できない。ガバナンス対象リージョンは追加可能</li><li>Control Towerが管理するリソース（StackSetで作成されたConfigやロール等）を<span class=\"trap\">手動で変更するとドリフト</span>となる</li><li>既存アカウントは、前提条件を満たした上で個別に、またはOU単位で登録（enroll）できる</li><li>追加で自作のカスタム統制が必要なら、<b class=\"key\">Customizations for AWS Control Tower (CfCT)</b>やAFTを使う</li></ul><h4>StackSets との関係</h4><ul><li><b class=\"key\">CloudFormation StackSets</b>は、Organizationsと統合したサービス管理の権限で、OU指定により新規アカウントへ<b class=\"key\">自動デプロイ</b>できる</li></ul>",
+     "oxIds": [
+      "ox-1-2-p3-a",
+      "ox-1-2-p3-b",
+      "ox-1-2-p3-c"
+     ]
+    },
+    {
+     "id": "1-2-p4",
+     "title": "AWS RAM とリソース共有",
+     "html": "<h4>RAMとは</h4><ul><li><b class=\"key\">AWS Resource Access Manager (RAM)</b>：リソースをアカウント間（または組織・OU単位）で<b class=\"key\">コピーせず共有</b>する。追加料金なし</li><li>共有できる主な例：<b class=\"key\">VPCサブネット</b>、<b class=\"key\">Transit Gateway</b>、Route 53 Resolverルール、License Manager設定、Aurora DBクラスター、プライベートCA、Systems Manager OpsItem等</li><li>OrganizationsでRAMの共有を有効化すると、招待の承諾なしで組織内に共有される</li></ul><h4>VPC共有（共有サブネット）</h4><ul><li>ネットワークアカウントがVPCを所有し、<b class=\"key\">サブネットを他アカウントと共有</b>。参加アカウントはそのサブネットにEC2/RDS等を起動できる</li><li>参加アカウントは自分のリソースを管理するが、<span class=\"trap\">VPC、サブネット、ルートテーブル、TGWアタッチメントは所有者のみ変更可</span></li><li>メリット：VPC数・VPC間接続・NATの削減、IP管理の集約。同一AZは物理AZ ID（use1-az1等）で揃える</li></ul><h4>注意</h4><ul><li><span class=\"trap\">S3やSQSなどはRAMではなく、リソースポリシーで共有</span>する</li><li>Transit Gatewayは共有しても、各アカウントが<b class=\"key\">自分のVPCアタッチメント</b>を作成する（承諾は自動承諾設定もあり）</li></ul>",
+     "oxIds": [
+      "ox-1-2-p4-a",
+      "ox-1-2-p4-b",
+      "ox-1-2-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1-3",
+   "title": "IAM Identity Center とクロスアカウントアクセス",
+   "pages": [
+    {
+     "id": "1-3-p1",
+     "title": "IAM Identity Center による集中ID管理",
+     "html": "<h4>IAM Identity Center（旧 AWS SSO）</h4><ul><li>組織全体のワークフォース認証・認可を一元化。複数アカウントと業務アプリへのシングルサインオンを提供</li><li><b class=\"key\">ID ソース</b>は1つだけ選ぶ：Identity Centerディレクトリ（内蔵）／AD Connector / AWS Managed Microsoft AD／<b class=\"key\">外部IdP（SAML 2.0、SCIMで自動プロビジョニング）</b></li><li><b class=\"key\">許可セット（Permission Set）</b>：IAMポリシーの集合。ユーザー/グループ×アカウント×許可セットを割り当てると、対象アカウントにIAMロール（AWSReservedSSO_...）が自動作成される</li><li>ユーザーはポータルからアカウントとロールを選び、<b class=\"key\">短期の認証情報</b>で操作。IAMユーザーとアクセスキーの配布が不要になる</li></ul><h4>設計のコツ</h4><ul><li>割り当ては<b class=\"key\">個人ではなくグループ単位</b>にする</li><li><b class=\"key\">属性ベースアクセス制御（ABAC）</b>：IdPの属性をセッションタグとして渡し、タグ条件でリソースへのアクセスを制御</li><li>Identity Centerは1つのリージョンにインスタンスを持つ。委任管理者を使えば管理アカウント外で運用可能</li><li><span class=\"trap\">アプリケーションのエンドユーザー（顧客）認証はCognito</span>。Identity Centerは従業員向け</li></ul>",
+     "oxIds": [
+      "ox-1-3-p1-a",
+      "ox-1-3-p1-b",
+      "ox-1-3-p1-c"
+     ]
+    },
+    {
+     "id": "1-3-p2",
+     "title": "クロスアカウントアクセス（STS AssumeRole）",
+     "html": "<h4>AssumeRoleの仕組み</h4><ul><li>ターゲットアカウントにIAMロールを作り、<b class=\"key\">信頼ポリシー</b>で「誰が引き受けられるか」を指定（プリンシパルにアカウントやロールを指定）</li><li>呼び出し側には<b class=\"key\">sts:AssumeRole を許可するIDポリシー</b>が必要。<span class=\"trap\">信頼ポリシーと呼び出し側の許可の両方が必要</span>（同一アカウント内では片方で足りる場合があるが、クロスアカウントは両方必須）</li><li>STSが<b class=\"key\">一時的な認証情報</b>（デフォルト1時間、ロールチェーンは最大1時間）を発行</li></ul><h4>関連機能</h4><table><tr><th>機能</th><th>用途</th></tr><tr><td>ExternalId</td><td><b class=\"key\">混乱した代理（confused deputy）問題</b>対策。サードパーティSaaSにロールを引き受けさせる時に信頼ポリシーへ条件として設定</td></tr><tr><td>aws:PrincipalOrgID</td><td>信頼ポリシーで自組織内のみに限定</td></tr><tr><td>MFA条件</td><td>aws:MultiFactorAuthPresent で引き受けにMFAを要求</td></tr><tr><td>SourceIdentity / セッションタグ</td><td>監査性の向上、ABAC</td></tr></table><ul><li>Webフェデレーション/SAMLフェデレーション：AssumeRoleWithWebIdentity / AssumeRoleWithSAML</li></ul>",
+     "oxIds": [
+      "ox-1-3-p2-a",
+      "ox-1-3-p2-b",
+      "ox-1-3-p2-c"
+     ]
+    },
+    {
+     "id": "1-3-p3",
+     "title": "リソースベースポリシーとクロスアカウント",
+     "html": "<h4>2つの方式の違い</h4><table><tr><th>方式</th><th>動き</th><th>向く場面</th></tr><tr><td>ロール引き受け</td><td>呼び出し元は<b class=\"key\">自分のアイデンティティを一時的に手放し</b>ターゲットのロールで動く</td><td>多数のサービスをまたぐ操作、監査をロール単位にしたい</td></tr><tr><td>リソースベースポリシー</td><td>呼び出し元は<b class=\"key\">元のアイデンティティのまま</b>リソースにアクセス</td><td>S3、SQS、SNS、KMS、Lambda、Secrets Managerなど。ロールの切替が不要</td></tr></table><h4>押さえるポイント</h4><ul><li>S3にクロスアカウントで書き込む場合：バケットポリシーとIDポリシーの両方が必要（別アカウントのプリンシパルの場合）</li><li>KMSキーは<b class=\"key\">キーポリシー</b>が主。クロスアカウントではキーポリシーで許可し、利用側もIDポリシーで許可</li><li><span class=\"trap\">別アカウントから書き込まれたS3オブジェクトの所有者</span>は書き込み側のままになる場合がある → <b class=\"key\">バケット所有者強制（BucketOwnerEnforced）</b>のACL無効化で解決</li><li>Lambdaを別アカウントから呼ぶ：関数のリソースベースポリシーで許可</li></ul>",
+     "oxIds": [
+      "ox-1-3-p3-a",
+      "ox-1-3-p3-b",
+      "ox-1-3-p3-c"
+     ]
+    },
+    {
+     "id": "1-3-p4",
+     "title": "ID フェデレーションと実務の判断",
+     "html": "<h4>よくあるシナリオと答え</h4><table><tr><th>要件</th><th>答え</th></tr><tr><td>社内ADの従業員が複数アカウントへSSO</td><td>IAM Identity Center + AD（AD Connector / Managed AD / 外部IdP）</td></tr><tr><td>外部IdP（Entra ID、Okta）からのユーザー/グループ自動同期</td><td><b class=\"key\">SCIM</b>プロビジョニング</td></tr><tr><td>EC2上アプリが他アカウントのS3へアクセス</td><td>インスタンスプロファイルのロールが<b class=\"key\">ターゲットのロールをAssumeRole</b>。アクセスキーは埋め込まない</td></tr><tr><td>オンプレのサーバーがAWSにアクセス</td><td><b class=\"key\">IAM Roles Anywhere</b>（X.509証明書で一時認証情報）／SSMハイブリッドアクティベーション</td></tr><tr><td>モバイルアプリのユーザーが自分のS3領域にアクセス</td><td>Cognito ID プール</td></tr></table><h4>引っ掛け</h4><ul><li><span class=\"trap\">長期のアクセスキーをアカウント間で配る</span>選択肢はほぼ誤り</li><li>緊急時のため管理アカウントに<b class=\"key\">ブレークグラス（緊急用）</b>アクセスを用意し、利用をアラート対象とする設計も出る</li></ul>",
+     "oxIds": [
+      "ox-1-3-p4-a",
+      "ox-1-3-p4-b",
+      "ox-1-3-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1-4",
+   "title": "VPC間接続と Transit Gateway・PrivateLink",
+   "pages": [
+    {
+     "id": "1-4-p1",
+     "title": "VPC ピアリングの特徴と限界",
+     "html": "<h4>VPCピアリング</h4><ul><li>2つのVPC間を<b class=\"key\">プライベートIPで1対1接続</b>。同一／別アカウント、同一／別リージョン（リージョン間ピアリング）が可能</li><li><span class=\"trap\">推移的ルーティング不可</span>：A-B、B-C をピアリングしても A と C は通信できない</li><li><b class=\"key\">CIDRが重複していると作成できない</b></li><li>双方のルートテーブルにピア宛ルートが必要。セキュリティグループ/NACLでも許可する</li><li>ピア先VPCの<b class=\"key\">IGW・NAT・VPNやDirect Connect</b>をエッジルーティングで借りることはできない</li><li>データ転送：同一AZ内は無料、AZ跨ぎやリージョン間は課金</li></ul><h4>使いどころ</h4><ul><li>少数VPCの単純な接続、<b class=\"key\">低コスト・低レイテンシ・帯域上限なし</b>（TGWにはアタッチメントあたりの帯域上限がある）</li><li>VPC数が増えると接続数が n(n-1)/2 で爆発 → <b class=\"key\">Transit Gateway</b>へ</li></ul>",
+     "oxIds": [
+      "ox-1-4-p1-a",
+      "ox-1-4-p1-b",
+      "ox-1-4-p1-c"
+     ]
+    },
+    {
+     "id": "1-4-p2",
+     "title": "Transit Gateway（TGW）",
+     "html": "<h4>ハブ＆スポーク</h4><ul><li>AWS Transit Gateway：リージョン単位のマネージドなクラウドルーター。VPC、VPN、Direct Connect Gateway、TGWピアリング、Connectをアタッチして<b class=\"key\">推移的</b>に接続</li><li><b class=\"key\">ルートテーブルを複数</b>持てる → アタッチメントごとに関連付け（association）と伝播（propagation）を制御してセグメンテーション（本番と開発の分離など）</li><li><b class=\"key\">リージョン間はTGWピアリング</b>（静的ルートのみ、動的伝播は不可）</li><li><b class=\"key\">ECMP</b>：複数のVPN接続を束ねて帯域を拡大（VPNアタッチメントで利用可）</li><li><b class=\"key\">RAM共有</b>で組織全体のVPCが同じTGWを利用。アタッチメントはVPCごと、AZごとにサブネットを指定</li><li>マルチキャストをサポート</li></ul><h4>代表パターン：集中型エグレス/検査</h4><ul><li>検査VPC（ファイアウォール、Network Firewall、Gateway Load Balancerのアプライアンス）をTGWに接続し、スポークの出入口トラフィックを集約</li><li><span class=\"trap\">非対称ルーティング回避</span>のため<b class=\"key\">アプライアンスモード</b>を有効化（同一フローを同じAZに固定）</li></ul><h4>選択基準</h4><table><tr><th>要件</th><th>答え</th></tr><tr><td>数十〜数千VPC、推移的接続、オンプレ統合</td><td>Transit Gateway</td></tr><tr><td>2〜3VPCの単純接続、最低コスト</td><td>VPCピアリング</td></tr></table>",
+     "oxIds": [
+      "ox-1-4-p2-a",
+      "ox-1-4-p2-b",
+      "ox-1-4-p2-c"
+     ]
+    },
+    {
+     "id": "1-4-p3",
+     "title": "AWS PrivateLink と VPC エンドポイント",
+     "html": "<h4>エンドポイントの種類</h4><table><tr><th>種類</th><th>特徴</th></tr><tr><td><b class=\"key\">ゲートウェイ型</b></td><td><b class=\"key\">S3とDynamoDBのみ</b>。ルートテーブルにプレフィックスリストで経路追加。無料。VPC外（オンプレ・別リージョン・ピア先）からは使えない</td></tr><tr><td><b class=\"key\">インターフェイス型</b>（PrivateLink）</td><td>サブネットにENIを作成。多くのAWSサービス・自社サービス・Marketplaceサービス。時間とデータ処理で課金。オンプレからDX/VPN経由でも利用可</td></tr><tr><td>GWLB エンドポイント</td><td>サードパーティアプライアンスへ透過的にトラフィックを送る</td></tr></table><h4>自社サービスの公開（エンドポイントサービス）</h4><ul><li>提供側：<b class=\"key\">NLB（またはGWLB）</b>の前にエンドポイントサービスを作成。利用側VPCにインターフェイスエンドポイントを作る</li><li><b class=\"key\">一方向・CIDR重複OK・数千VPCに公開可</b>・VPC全体ではなく特定サービスのみを公開できる</li><li><span class=\"trap\">VPC全体のネットワーク接続が必要ならPeering/TGW、特定サービスだけをプライベート公開するならPrivateLink</span></li></ul><h4>追加ポイント</h4><ul><li>インターフェイスエンドポイントの<b class=\"key\">プライベートDNS</b>を有効にすると、標準のサービス名がVPC内でエンドポイントのIPに解決される</li><li>エンドポイントポリシーでアクセス可能なプリンシパル/リソースを制限（例：自組織のバケットだけ）</li><li>S3には、オンプレから使えるインターフェイス型エンドポイントもある</li></ul>",
+     "oxIds": [
+      "ox-1-4-p3-a",
+      "ox-1-4-p3-b",
+      "ox-1-4-p3-c"
+     ]
+    },
+    {
+     "id": "1-4-p4",
+     "title": "接続方式の選択と VPC 共有",
+     "html": "<h4>判断フロー</h4><table><tr><th>要件</th><th>選択</th></tr><tr><td>特定の1サービスだけを多数のアカウント/VPCに公開、CIDR重複あり</td><td>PrivateLink</td></tr><tr><td>多数のVPCを全体接続、オンプレも接続</td><td>Transit Gateway</td></tr><tr><td>2つのVPCだけ、安価・高帯域</td><td>VPCピアリング</td></tr><tr><td>ネットワークを集約し、各チームはサブネット内にリソースだけ置きたい</td><td>VPC共有（RAM）</td></tr><tr><td>AWSサービス（S3等）へインターネットを経由せず接続</td><td>VPCエンドポイント</td></tr></table><h4>集中型エグレス</h4><ul><li>NATゲートウェイを<b class=\"key\">エグレスVPCに集約</b>し、スポークからはTGW経由。NAT数とコストを削減</li><li>ただし<span class=\"trap\">NATゲートウェイはAZ単位</span>：可用性のためAZごとに配置する</li><li>IPv6のみのエグレスには<b class=\"key\">Egress-only インターネットゲートウェイ</b></li></ul><h4>VPC Lattice</h4><ul><li><b class=\"key\">Amazon VPC Lattice</b>：サービス間（アプリ層）の接続・認可を、VPC/アカウントをまたいで簡素化するアプリケーションネットワーク。CIDR重複でも可、認証ポリシー（IAM）でサービス単位の制御</li></ul>",
+     "oxIds": [
+      "ox-1-4-p4-a",
+      "ox-1-4-p4-b",
+      "ox-1-4-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1-5",
+   "title": "ハイブリッド接続：Direct Connect と VPN",
+   "pages": [
+    {
+     "id": "1-5-p1",
+     "title": "Site-to-Site VPN",
+     "html": "<h4>基本</h4><ul><li>AWS Site-to-Site VPN：インターネット経由の<b class=\"key\">IPsecトンネル</b>。1接続あたり<b class=\"key\">冗長な2本のトンネル</b>（AZ別のエンドポイント）</li><li>AWS側終端：仮想プライベートゲートウェイ（VGW）／Transit Gateway／（アクセラレートVPNはTGWのみ）</li><li>1トンネルあたりの帯域は最大約1.25Gbps。<b class=\"key\">TGW+ECMP</b>で複数接続を束ねて帯域拡大（VGWはECMP非対応）</li><li>ルーティング：<b class=\"key\">BGP（動的）</b>または静的。冗長性・フェイルオーバーにはBGP推奨</li><li><b class=\"key\">アクセラレートVPN</b>：Global Acceleratorを使いエッジ経由でトンネルの品質を改善</li></ul><h4>用途</h4><ul><li>即時に使える、低コスト、DXのバックアップ、暗号化が必要な経路</li><li><span class=\"trap\">レイテンシ・帯域が安定しない</span>ため、大容量や安定性要件にはDirect Connect</li></ul>",
+     "oxIds": [
+      "ox-1-5-p1-a",
+      "ox-1-5-p1-b",
+      "ox-1-5-p1-c"
+     ]
+    },
+    {
+     "id": "1-5-p2",
+     "title": "AWS Direct Connect",
+     "html": "<h4>特徴</h4><ul><li>専用線でオンプレミスとAWSを接続。安定した低レイテンシ、大容量、データ転送料の低減</li><li>接続形態：<b class=\"key\">専用接続</b>（1/10/100Gbps、顧客がロケーションで物理接続）、ホスト接続（パートナー経由、より小さな帯域）</li><li>仮想インターフェイス（VIF）：<b class=\"key\">プライベートVIF</b>（VPC）、パブリックVIF（パブリックサービスのIP）、<b class=\"key\">トランジットVIF</b>（Direct Connect GatewayからTGWへ）</li><li><span class=\"trap\">DXそのものは暗号化されない</span>：暗号化には<b class=\"key\">DX上のSite-to-Site VPN（パブリックVIFまたはトランジットVIF上のIPsec）</b>か、MACsec（専用接続）を使う</li><li>開通までに<b class=\"key\">数週間以上</b>かかることがある → 即時要件にはVPN</li></ul><h4>Direct Connect Gateway</h4><ul><li><b class=\"key\">グローバルなリソース</b>。1つのDX接続から、複数リージョン・複数アカウントのVPC（VGW）やTGWに接続可能</li><li><span class=\"trap\">DX Gateway同士やVPC間の通信を仲介はしない</span>（VPC間通信は不可）</li><li>プライベートVIF→DX Gateway→VGW／トランジットVIF→DX Gateway→TGW</li></ul>",
+     "oxIds": [
+      "ox-1-5-p2-a",
+      "ox-1-5-p2-b",
+      "ox-1-5-p2-c"
+     ]
+    },
+    {
+     "id": "1-5-p3",
+     "title": "高可用性設計と組み合わせ",
+     "html": "<h4>冗長性の段階（レジリエンシー）</h4><table><tr><th>構成</th><th>SLA観点</th></tr><tr><td>最大レジリエンス</td><td><b class=\"key\">異なる2つ以上のDXロケーション</b>、それぞれに別デバイスで2本以上</td></tr><tr><td>高レジリエンス</td><td>2つのロケーションに1本ずつ</td></tr><tr><td>開発/テスト</td><td>1ロケーションに別デバイスで2本</td></tr></table><h4>バックアップ構成</h4><ul><li><b class=\"key\">DX + Site-to-Site VPN</b>をバックアップ：BGPで<b class=\"key\">DXを優先</b>（AS PATHやローカル優先度）。DXが選好されるのは最長プレフィックス一致が同じ場合の既定動作</li><li>DX + DX：二重化。コストは高いが帯域保証</li><li><span class=\"trap\">最長プレフィックス一致が最優先</span>：DX側に長いプレフィックスを広告すればDX、VPN側を短くすれば確実にDX優先にできる</li></ul><h4>BFD</h4><ul><li><b class=\"key\">BFD（双方向フォワーディング検出）</b>を有効化すると障害検知とフェイルオーバーが速くなる</li></ul>",
+     "oxIds": [
+      "ox-1-5-p3-a",
+      "ox-1-5-p3-b",
+      "ox-1-5-p3-c"
+     ]
+    },
+    {
+     "id": "1-5-p4",
+     "title": "ハイブリッド接続の選択問題パターン",
+     "html": "<h4>要件別の答え</h4><table><tr><th>要件</th><th>答え</th></tr><tr><td>数日以内の接続、暗号化必須、予算小</td><td>Site-to-Site VPN</td></tr><tr><td>大容量、安定、低遅延、暗号化も必要</td><td>DX + その上のIPsec VPN</td></tr><tr><td>複数アカウント/リージョンのVPCをDXでつなぐ</td><td>DX Gateway + TGW（トランジットVIF）</td></tr><tr><td>DXの帯域が足りない（1Gbps回線のみ）</td><td>LAG（リンク集約）、または追加回線／上位帯域の接続</td></tr><tr><td>数千のリモートPCやクライアント</td><td><b class=\"key\">AWS Client VPN</b>（OpenVPNベース）</td></tr><tr><td>拠点のSD-WAN等</td><td><b class=\"key\">TGW Connect（GRE+BGP）</b></td></tr><tr><td>大規模データ移行（TB〜PB）</td><td>Snowball／DataSync。回線だけに頼らない</td></tr></table><ul><li><span class=\"trap\">DX回線は1本ではSPOF</span>。「高可用性」と書かれていたら冗長化が答え</li><li><b class=\"key\">ホストDX接続</b>はパートナー経由で小帯域も可</li></ul>",
+     "oxIds": [
+      "ox-1-5-p4-a",
+      "ox-1-5-p4-b",
+      "ox-1-5-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1-6",
+   "title": "Route 53 とハイブリッド DNS",
+   "pages": [
+    {
+     "id": "1-6-p1",
+     "title": "Route 53 ホストゾーンとルーティングポリシー",
+     "html": "<h4>ホストゾーン</h4><ul><li>パブリックホストゾーン：インターネット向け。<b class=\"key\">プライベートホストゾーン（PHZ）</b>：関連付けたVPC内のみで解決</li><li>PHZ利用には、VPCの<b class=\"key\">enableDnsHostnames と enableDnsSupport</b>を有効にする</li><li>別アカウントのVPCをPHZに関連付けるには、まず所有側で<b class=\"key\">関連付け承認</b>を作成し、VPC側アカウントがAPI/CLIで関連付ける（CLI/API操作が必要）</li></ul><h4>ルーティングポリシー</h4><table><tr><th>ポリシー</th><th>用途</th></tr><tr><td>シンプル</td><td>1レコード</td></tr><tr><td>加重</td><td>割合配分、カナリア</td></tr><tr><td>レイテンシー</td><td>最も低遅延のリージョン</td></tr><tr><td>フェイルオーバー</td><td>ヘルスチェックでアクティブ/パッシブ</td></tr><tr><td>位置情報</td><td>ユーザーの地域で振り分け（規制・言語）</td></tr><tr><td>地理的近接性</td><td>距離と<b class=\"key\">バイアス</b>で調整（Traffic Flow）</td></tr><tr><td>複数値回答</td><td>ヘルスチェック付きで複数IP返却</td></tr><tr><td>IPベース</td><td>クライアントCIDRで振り分け</td></tr></table><ul><li><span class=\"trap\">エイリアスレコード</span>：Zone Apex（ルートドメイン）に使える。ALB/CloudFront/S3静的サイト等を指す。AWSリソース宛のエイリアスクエリは無料。CNAMEは apex に使えない</li></ul>",
+     "oxIds": [
+      "ox-1-6-p1-a",
+      "ox-1-6-p1-b",
+      "ox-1-6-p1-c"
+     ]
+    },
+    {
+     "id": "1-6-p2",
+     "title": "Route 53 Resolver とハイブリッド DNS",
+     "html": "<h4>仕組み</h4><ul><li>VPC内ではRoute 53 Resolver（.2アドレス／AmazonProvidedDNS）が自動的に利用可能</li><li>デフォルトではオンプレのDNSとVPCのDNSは<span class=\"trap\">相互に名前解決できない</span></li><li><b class=\"key\">インバウンドエンドポイント</b>：<b class=\"key\">オンプレ → AWS</b>の名前解決。オンプレDNSからPHZ等をVPCのENI IPへ転送</li><li><b class=\"key\">アウトバウンドエンドポイント</b>＋転送ルール：<b class=\"key\">AWS → オンプレ</b>。例：corp.example.com をオンプレDNSへ転送</li><li>エンドポイントは<b class=\"key\">複数AZのENI</b>で冗長化（最低2つのIPを推奨）。DX/VPN経由で到達できること</li><li>Resolverルールの共有：RAMで組織内に共有し、他アカウントVPCに関連付ける（エンドポイントは1アカウントに集約）</li></ul><h4>集中型DNSの例</h4><ul><li>共有サービスアカウントにエンドポイントと転送ルール、PHZをVPCに関連付け、<b class=\"key\">RAMでルールを共有</b></li><li>Route 53 Resolver DNS Firewall：ドメインの許可/拒否リストでVPCからのDNS解決を制御（DNSトンネリング対策）</li><li>Resolver クエリログ：VPCからのDNSクエリをS3/CloudWatch Logs/Firehoseへ</li></ul>",
+     "oxIds": [
+      "ox-1-6-p2-a",
+      "ox-1-6-p2-b",
+      "ox-1-6-p2-c"
+     ]
+    },
+    {
+     "id": "1-6-p3",
+     "title": "マルチアカウント環境の DNS 設計",
+     "html": "<h4>パターン</h4><table><tr><th>要件</th><th>設計</th></tr><tr><td>多数のVPCで同じプライベートゾーンを使う</td><td><b class=\"key\">PHZを複数VPCに関連付け</b>（アカウント跨ぎは承認＋関連付け）</td></tr><tr><td>オンプレ⇔AWSの双方向</td><td>インバウンド＋アウトバウンドのエンドポイントを共有サービスVPCに集約、転送ルールをRAM共有</td></tr><tr><td>VPCエンドポイントのDNS名を他VPCから解決</td><td>PHZのレコードをVPC関連付け、またはTGW経由で共有。インターフェイスエンドポイントのプライベートDNSは<span class=\"trap\">そのVPC内のみ</span>有効</td></tr><tr><td>DNS通信の可用性</td><td>Route 53は100%可用性SLA。ヘルスチェックはエンドポイントやCloudWatchアラームに基づく</td></tr></table><h4>DNSSEC / 機密性</h4><ul><li>パブリックホストゾーンでは<b class=\"key\">DNSSEC署名</b>が可能（KMSの非対称キー、us-east-1）</li><li><b class=\"key\">Route 53 Profiles</b>：複数VPCにDNS設定（PHZ関連付け、Resolverルール、DNS Firewallルールグループ）を一括適用し、RAMで共有できる</li></ul>",
+     "oxIds": [
+      "ox-1-6-p3-a",
+      "ox-1-6-p3-b",
+      "ox-1-6-p3-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1-7",
+   "title": "集中ログとセキュリティガバナンス",
+   "pages": [
+    {
+     "id": "1-7-p1",
+     "title": "組織 CloudTrail と集中ログ",
+     "html": "<h4>CloudTrail</h4><ul><li><b class=\"key\">組織の証跡（Organization trail）</b>：管理アカウント（または委任管理者）で作成すると、全メンバーアカウント・全リージョンのイベントを1つのS3バケットに記録。メンバーは証跡を変更・削除できない</li><li>管理イベントはデフォルト記録、データイベント（S3オブジェクト、Lambda実行等）は追加設定</li><li><b class=\"key\">ログファイルの整合性検証</b>（ダイジェストファイル）で改ざん検知</li><li>CloudTrail Lake：イベントデータストアに対しSQLでクエリ（組織イベントデータストア可）</li></ul><h4>ログ集約の設計</h4><ul><li><b class=\"key\">ログアーカイブアカウント</b>に集中S3バケット：バケットポリシーで書き込みを許可し、SSE-KMS、バージョニング、<b class=\"key\">S3 Object Lock（コンプライアンスモード）</b>、MFA Delete、ライフサイクル（Glacierへ移行）</li><li>CloudWatch Logsのクロスアカウント集約：<b class=\"key\">サブスクリプションフィルタ</b>→Kinesis Data Streams／Firehose／Lambda。CloudWatch ログのクロスアカウント/リージョン監視アカウント機能（Observability Access Manager）もある</li><li><span class=\"trap\">ログ改ざん防止</span>の要件 → Object Lock + 別アカウントに隔離 + SCPで削除禁止</li><li>分析：Athena、OpenSearch、<b class=\"key\">Amazon Security Lake</b>（OCSF形式でセキュリティデータを集約、組織全体）</li></ul>",
+     "oxIds": [
+      "ox-1-7-p1-a",
+      "ox-1-7-p1-b",
+      "ox-1-7-p1-c"
+     ]
+    },
+    {
+     "id": "1-7-p2",
+     "title": "AWS Config による構成管理",
+     "html": "<h4>Configの役割</h4><ul><li>リソース構成の記録、変更履歴、ルールによる準拠評価（マネージドルール／Lambdaカスタムルール／Guard）</li><li><b class=\"key\">自動修復</b>：SSM Automationランブックで非準拠リソースを修正</li><li><b class=\"key\">コンフォーマンスパック</b>：ルールと修復のセットを一括配備（組織単位でも可）</li><li><b class=\"key\">Config アグリゲーター</b>：複数アカウント・リージョンの構成と準拠状況を1つのアカウントに集約（Organizations連携で自動的に全アカウントを対象に）。<span class=\"trap\">アグリゲーターは参照用の集約で、ルール適用そのものではない</span></li><li><b class=\"key\">組織のConfigルール</b>：管理アカウント／委任管理者から全アカウントへルールを展開</li><li>高度なクエリでSQL風に構成情報を検索</li></ul><h4>使い分け</h4><table><tr><th>知りたいこと</th><th>サービス</th></tr><tr><td>誰がAPIを呼んだか</td><td>CloudTrail</td></tr><tr><td>リソースが今どんな構成で、準拠しているか</td><td>Config</td></tr><tr><td>性能・メトリクス</td><td>CloudWatch</td></tr><tr><td>脅威の検知</td><td>GuardDuty</td></tr></table>",
+     "oxIds": [
+      "ox-1-7-p2-a",
+      "ox-1-7-p2-b",
+      "ox-1-7-p2-c"
+     ]
+    },
+    {
+     "id": "1-7-p3",
+     "title": "GuardDuty・Security Hub・Inspector・Macie",
+     "html": "<h4>役割の整理</h4><table><tr><th>サービス</th><th>役割</th></tr><tr><td>GuardDuty</td><td>脅威検出。CloudTrail、VPCフローログ、DNSログ、S3データイベント、EKS監査ログ、Lambda、マルウェア保護などを分析</td></tr><tr><td>Security Hub</td><td>検出結果の<b class=\"key\">集約と準拠スコア</b>。CIS/PCI/AWS基礎セキュリティのベストプラクティス基準、ASFF形式。GuardDuty、Inspector、Macie、Firewall Managerなどの結果を統合</td></tr><tr><td>Inspector</td><td>EC2、ECRコンテナイメージ、Lambdaの<b class=\"key\">脆弱性スキャン</b></td></tr><tr><td>Macie</td><td>S3の<b class=\"key\">機密データ（PII）検出</b></td></tr><tr><td>Detective</td><td>検出結果の根本原因を調査（グラフ分析）</td></tr><tr><td>IAM Access Analyzer</td><td>外部（組織外）に公開されたリソースや未使用アクセスの検出、ポリシー検証</td></tr></table><h4>組織での展開</h4><ul><li>GuardDuty／Security Hub／Macie／Inspectorは委任管理者を設定し、<b class=\"key\">新規アカウントを自動有効化</b>。<b class=\"key\">集約リージョン</b>でマルチリージョンの結果を集約（Security Hub）</li><li><span class=\"trap\">Security Hubは検出そのものではなく集約。有効化にはConfigの記録が前提</span></li><li>自動対処：<b class=\"key\">EventBridge</b>でSecurity Hub／GuardDutyの検出結果を受け、Lambda/SSM/Step Functionsで修復</li></ul>",
+     "oxIds": [
+      "ox-1-7-p3-a",
+      "ox-1-7-p3-b",
+      "ox-1-7-p3-c"
+     ]
+    },
+    {
+     "id": "1-7-p4",
+     "title": "Firewall Manager・Audit Manager・その他統制",
+     "html": "<h4>AWS Firewall Manager</h4><ul><li>Organizationsと連携し、WAFルール、Shield Advanced、セキュリティグループ、Network Firewall、Route 53 Resolver DNS Firewall等のポリシーを<b class=\"key\">組織全体へ一括適用・準拠監視</b></li><li>前提：Organizationsの全機能、<b class=\"key\">Firewall Manager管理者アカウント</b>、Config有効化</li><li>新規アカウント・新規リソースにも<b class=\"key\">自動適用</b></li></ul><h4>その他のガバナンスサービス</h4><table><tr><th>サービス</th><th>ポイント</th></tr><tr><td>AWS Artifact</td><td>AWSのコンプライアンスレポートの入手</td></tr><tr><td>Audit Manager</td><td>監査証拠の継続収集と監査レポート作成</td></tr><tr><td>Service Catalog</td><td>承認済みの製品（CFnテンプレート）の<b class=\"key\">セルフサービス提供</b>、制約・ポートフォリオ共有</td></tr><tr><td>Trusted Advisor</td><td>コスト・セキュリティ等の推奨チェック（フルチェックはBusiness/Enterprise以上のサポート）</td></tr><tr><td>Systems Manager</td><td>パッチ、Session Manager、Quick Setupで組織展開</td></tr><tr><td>Health Dashboard</td><td>組織ビューでAWSの障害・計画イベントを集約</td></tr></table><ul><li><span class=\"trap\">「承認済み構成だけをユーザーが選んで作れる」</span>→ Service Catalog。<span class=\"trap\">「新規アカウントにも自動でWAFを強制」</span>→ Firewall Manager</li></ul>",
+     "oxIds": [
+      "ox-1-7-p4-a",
+      "ox-1-7-p4-b",
+      "ox-1-7-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1-8",
+   "title": "コスト管理とタグ戦略",
+   "pages": [
+    {
+     "id": "1-8-p1",
+     "title": "コスト配分タグと Cost Explorer",
+     "html": "<h4>コスト配分タグ</h4><ul><li>AWS生成タグ（aws:createdBy等）とユーザー定義タグ。コスト配分タグとして<b class=\"key\">有効化（アクティブ化）</b>して初めてCost Explorer／CURに反映</li><li><span class=\"trap\">有効化前の過去分には遡って反映されない</span>（有効化以降）</li><li><b class=\"key\">タグポリシー</b>（Organizations）でキー名・値の表記ゆれを防止。SCPで必須タグなしのリソース作成を拒否（aws:RequestTag条件）</li><li>タグ未対応のコストや共有コストは<b class=\"key\">コストカテゴリ</b>（ルールで分類）や分割コスト配分データ（ECS/EKS）で配分</li></ul><h4>Cost Explorer</h4><ul><li>標準で過去13か月分(設定で期間拡張も可)＋予測（最大12か月）の可視化・フィルタ・グループ化。<b class=\"key\">リザベーション/Savings Plansの利用率・カバレッジ</b>レポートと購入推奨</li><li>組織の管理アカウントでは全メンバーが見える。メンバーの閲覧は設定で可否を制御</li></ul><h4>Cost Anomaly Detection</h4><ul><li>機械学習で<b class=\"key\">異常な支出</b>を検知し、SNS/Eメールで通知</li></ul>",
+     "oxIds": [
+      "ox-1-8-p1-a",
+      "ox-1-8-p1-b",
+      "ox-1-8-p1-c"
+     ]
+    },
+    {
+     "id": "1-8-p2",
+     "title": "AWS Budgets と請求の統制",
+     "html": "<h4>AWS Budgets</h4><ul><li>種類：コスト予算、使用量予算、RI/Savings Plansの利用率・カバレッジ予算</li><li><b class=\"key\">実績値と予測値</b>の両方でしきい値アラート（SNS/Eメール/Chatbot）</li><li><b class=\"key\">予算アクション</b>：しきい値超過時にIAM/SCPポリシーの適用、EC2/RDSインスタンスの停止などを自動実行</li><li><span class=\"trap\">Budgetsは通知・アクションであり、課金を自動的に止めるハードリミットではない</span></li></ul><h4>組織の請求</h4><ul><li><b class=\"key\">一括請求</b>：使用量の合算によりボリューム割引（S3、データ転送など）、<b class=\"key\">RI/Savings Plansの割引共有</b>を組織全体で適用（共有を無効にするアカウント設定も可）</li><li>Sandbox OU用に、アカウント単位の予算と予算アクションを設定し、超過時にSCPで操作を拒否するパターンが定番</li><li><b class=\"key\">請求コンソールへのアクセス</b>はIAMで明示的に有効化が必要（IAMユーザー/ロール向けアクセス）</li></ul>",
+     "oxIds": [
+      "ox-1-8-p2-a",
+      "ox-1-8-p2-b",
+      "ox-1-8-p2-c"
+     ]
+    },
+    {
+     "id": "1-8-p3",
+     "title": "Cost and Usage Report（CUR）と分析",
+     "html": "<h4>CUR（Cost and Usage Report）</h4><ul><li>最も<b class=\"key\">詳細</b>なコスト・使用量データ。リソースID・タグ・時間単位まで含む。S3に定期出力</li><li>形式：CSV／Parquet。<b class=\"key\">Athena統合</b>（Glueクローラ、CloudFormationテンプレート自動生成）でSQL分析、QuickSightで可視化、Redshift連携</li><li><b class=\"key\">CUR 2.0 / Data Exports</b>：新しいデータエクスポート（カラムを選択可能）</li><li>管理アカウントで作成すれば組織全体を含む</li></ul><h4>使い分け</h4><table><tr><th>目的</th><th>ツール</th></tr><tr><td>手軽な傾向把握・予測</td><td>Cost Explorer</td></tr><tr><td>しきい値監視・アクション</td><td>Budgets</td></tr><tr><td>リソース単位の詳細分析、チャージバック</td><td>CUR + Athena + QuickSight</td></tr><tr><td>異常検知</td><td>Cost Anomaly Detection</td></tr><tr><td>右サイジング推奨</td><td>Compute Optimizer</td></tr><tr><td>購入オプション</td><td>Savings Plans（Compute SPは柔軟）/ RI</td></tr></table><ul><li><span class=\"trap\">部署別請求（チャージバック）</span>：アカウント分離（最も確実）＋タグ＋コストカテゴリ</li></ul>",
+     "oxIds": [
+      "ox-1-8-p3-a",
+      "ox-1-8-p3-b",
+      "ox-1-8-p3-c"
+     ]
+    }
+   ]
+  }
+ ],
+ "ox": [
+  {
+   "id": "ox-1-1-p1-a",
+   "lesson": "1-1",
+   "text": "SCPおよびタグポリシーなどの統制機能を利用するには、Organizationsを「全機能」で有効化する必要がある。",
+   "answer": true,
+   "explain": "一括請求のみのモードでは統制機能は使えません。全機能にする必要があります。"
+  },
+  {
+   "id": "ox-1-1-p1-b",
+   "lesson": "1-1",
+   "text": "OUは1階層のみで、入れ子にはできない。",
+   "answer": false,
+   "explain": "OUは最大5階層まで入れ子にできます。"
+  },
+  {
+   "id": "ox-1-1-p1-c",
+   "lesson": "1-1",
+   "text": "管理アカウントには本番ワークロードを置くのが推奨である。",
+   "answer": false,
+   "explain": "管理アカウントはSCPの対象外で影響範囲が大きいため、本番ワークロードは置かないのがベストプラクティスです。"
+  },
+  {
+   "id": "ox-1-1-p2-a",
+   "lesson": "1-1",
+   "text": "SCPはIAMポリシーと同様にプリンシパルへ権限を付与できる。",
+   "answer": false,
+   "explain": "SCPは許可の上限を定めるだけで、権限を付与しません。IAM側の許可も必要です。"
+  },
+  {
+   "id": "ox-1-1-p2-b",
+   "lesson": "1-1",
+   "text": "SCPはメンバーアカウントのルートユーザーにも適用される。",
+   "answer": true,
+   "explain": "メンバーアカウントのルートユーザーはSCPの対象です（管理アカウントは対象外）。"
+  },
+  {
+   "id": "ox-1-1-p2-c",
+   "lesson": "1-1",
+   "text": "SCPは管理アカウントのIAMロールの操作も制限できる。",
+   "answer": false,
+   "explain": "管理アカウントにはSCPは適用されません。"
+  },
+  {
+   "id": "ox-1-1-p3-a",
+   "lesson": "1-1",
+   "text": "特定リージョン以外の利用を禁止するには、SCPでaws:RequestedRegion条件を使うのが一般的である。",
+   "answer": true,
+   "explain": "リージョン制限の定番です。グローバルサービスはNotActionで除外します。"
+  },
+  {
+   "id": "ox-1-1-p3-b",
+   "lesson": "1-1",
+   "text": "リソースポリシーで自組織のアカウントだけにアクセスを許可するには、aws:PrincipalOrgID条件キーが使える。",
+   "answer": true,
+   "explain": "アカウントIDを列挙せず組織単位で許可できます。"
+  },
+  {
+   "id": "ox-1-1-p3-c",
+   "lesson": "1-1",
+   "text": "開発者が作成するIAMロールの権限の天井を、アカウント内で委任管理するにはSCPが最適である。",
+   "answer": false,
+   "explain": "その用途はIAM権限境界です。SCPは組織レベルのガードレールです。"
+  },
+  {
+   "id": "ox-1-1-p4-a",
+   "lesson": "1-1",
+   "text": "GuardDutyなどのセキュリティサービスは、管理アカウント以外を委任管理者に指定できる。",
+   "answer": true,
+   "explain": "セキュリティ専用アカウントを委任管理者にするのが推奨構成です。"
+  },
+  {
+   "id": "ox-1-1-p4-b",
+   "lesson": "1-1",
+   "text": "タグポリシーはタグのないリソースの作成を常に自動で拒否する。",
+   "answer": false,
+   "explain": "基本は準拠評価です。作成拒否はサポート対象リソースで強制設定した場合に限られます。"
+  },
+  {
+   "id": "ox-1-1-p4-c",
+   "lesson": "1-1",
+   "text": "RCPはIAMプリンシパルに対する権限の上限を設定するポリシーである。",
+   "answer": false,
+   "explain": "RCPはリソースに対する権限の上限です。プリンシパル側はSCPです。"
+  },
+  {
+   "id": "ox-1-2-p1-a",
+   "lesson": "1-2",
+   "text": "マルチアカウント構成の利点には、爆発半径の限定と請求の分離が含まれる。",
+   "answer": true,
+   "explain": "どちらも主要な目的です。"
+  },
+  {
+   "id": "ox-1-2-p1-b",
+   "lesson": "1-2",
+   "text": "ログアーカイブアカウントは、通常Workloads OUに置く。",
+   "answer": false,
+   "explain": "ログやセキュリティ関連はSecurity OUに置くのが推奨です。"
+  },
+  {
+   "id": "ox-1-2-p1-c",
+   "lesson": "1-2",
+   "text": "Sandbox OUには本番並みの広い権限を与え、予算制限は設けない。",
+   "answer": false,
+   "explain": "Sandboxは予算上限と厳しいSCPで統制するのが一般的です。"
+  },
+  {
+   "id": "ox-1-2-p2-a",
+   "lesson": "1-2",
+   "text": "Control Towerの予防的ガードレールはAWS Configルールで実装される。",
+   "answer": false,
+   "explain": "予防的はSCP、発見的がConfigルールで実装されます。"
+  },
+  {
+   "id": "ox-1-2-p2-b",
+   "lesson": "1-2",
+   "text": "Control Towerのランディングゾーンには、ログアーカイブアカウントと監査アカウントが含まれる。",
+   "answer": true,
+   "explain": "Security OUに作成されます。"
+  },
+  {
+   "id": "ox-1-2-p2-c",
+   "lesson": "1-2",
+   "text": "プロアクティブコントロールは、CloudFormationテンプレートのデプロイ前に違反を検査する。",
+   "answer": true,
+   "explain": "CloudFormation Hooksで実装されます。"
+  },
+  {
+   "id": "ox-1-2-p3-a",
+   "lesson": "1-2",
+   "text": "Control Towerのホームリージョンは、構築後に自由に変更できる。",
+   "answer": false,
+   "explain": "ホームリージョンは後から変更できません。"
+  },
+  {
+   "id": "ox-1-2-p3-b",
+   "lesson": "1-2",
+   "text": "StackSetsをOrganizationsと統合すると、OUに追加された新しいアカウントへ自動的にスタックを展開できる。",
+   "answer": true,
+   "explain": "サービス管理の権限と自動デプロイを使います。"
+  },
+  {
+   "id": "ox-1-2-p3-c",
+   "lesson": "1-2",
+   "text": "Control Tower管理下のリソースを手動で変更すると、ドリフトとして検出されることがある。",
+   "answer": true,
+   "explain": "管理リソースの手動変更はドリフトの原因です。"
+  },
+  {
+   "id": "ox-1-2-p4-a",
+   "lesson": "1-2",
+   "text": "RAMを使うと、VPCのサブネットを組織内の他アカウントと共有できる。",
+   "answer": true,
+   "explain": "VPC共有はRAMの代表例です。"
+  },
+  {
+   "id": "ox-1-2-p4-b",
+   "lesson": "1-2",
+   "text": "共有サブネットを利用する参加アカウントは、そのサブネットのルートテーブルを変更できる。",
+   "answer": false,
+   "explain": "ルートテーブルやサブネット自体は所有者のみ管理できます。"
+  },
+  {
+   "id": "ox-1-2-p4-c",
+   "lesson": "1-2",
+   "text": "S3バケットのアカウント間共有には、RAMの利用が必須である。",
+   "answer": false,
+   "explain": "S3はバケットポリシー等のリソースポリシーで共有します。"
+  },
+  {
+   "id": "ox-1-3-p1-a",
+   "lesson": "1-3",
+   "text": "IAM Identity Centerでは、複数のIDソースを同時に有効化できる。",
+   "answer": false,
+   "explain": "IDソースは同時に1つだけ選択します。"
+  },
+  {
+   "id": "ox-1-3-p1-b",
+   "lesson": "1-3",
+   "text": "IAM Identity Centerに許可セットを割り当てると、対象アカウントにIAMロールが自動的に作成される。",
+   "answer": true,
+   "explain": "AWSReservedSSO_で始まるロールが作られます。"
+  },
+  {
+   "id": "ox-1-3-p1-c",
+   "lesson": "1-3",
+   "text": "Webアプリの一般消費者のサインアップ・サインインには、IAM Identity Centerが適している。",
+   "answer": false,
+   "explain": "顧客向けIDはAmazon Cognitoの領域です。"
+  },
+  {
+   "id": "ox-1-3-p2-a",
+   "lesson": "1-3",
+   "text": "クロスアカウントのAssumeRoleでは、ロールの信頼ポリシーと呼び出し元側の許可の両方が必要になる。",
+   "answer": true,
+   "explain": "クロスアカウントでは両側の許可が必要です。"
+  },
+  {
+   "id": "ox-1-3-p2-b",
+   "lesson": "1-3",
+   "text": "サードパーティにロールを引き受けさせる際、confused deputy問題の対策としてExternalIdを使う。",
+   "answer": true,
+   "explain": "信頼ポリシーにExternalIdの条件を設定します。"
+  },
+  {
+   "id": "ox-1-3-p2-c",
+   "lesson": "1-3",
+   "text": "STSで発行される一時認証情報は、有効期限がなく失効させるまで使える。",
+   "answer": false,
+   "explain": "一時認証情報には有効期限があります。"
+  },
+  {
+   "id": "ox-1-3-p3-a",
+   "lesson": "1-3",
+   "text": "S3バケットポリシーでクロスアカウントを許可すれば、呼び出し元はロールを引き受けずに直接アクセスできる。",
+   "answer": true,
+   "explain": "リソースベースポリシーは元のアイデンティティのままアクセスできます。"
+  },
+  {
+   "id": "ox-1-3-p3-b",
+   "lesson": "1-3",
+   "text": "別アカウントから書き込まれたS3オブジェクトの所有権問題は、BucketOwnerEnforcedで解決できる。",
+   "answer": true,
+   "explain": "ACLを無効化し、バケット所有者が所有者となります。"
+  },
+  {
+   "id": "ox-1-3-p3-c",
+   "lesson": "1-3",
+   "text": "クロスアカウントでKMSキーを使うには、利用側のIDポリシーのみで足りる。",
+   "answer": false,
+   "explain": "キーポリシーでの許可が必須です。"
+  },
+  {
+   "id": "ox-1-3-p4-a",
+   "lesson": "1-3",
+   "text": "オンプレミスのサーバーがAWSリソースにアクセスする際、長期アクセスキーの代わりにIAM Roles Anywhereを使える。",
+   "answer": true,
+   "explain": "X.509証明書で一時認証情報を取得します。"
+  },
+  {
+   "id": "ox-1-3-p4-b",
+   "lesson": "1-3",
+   "text": "外部IdPのユーザーとグループをIAM Identity Centerへ自動同期するには、SCIMを使う。",
+   "answer": true,
+   "explain": "SCIMで自動プロビジョニングされます。"
+  },
+  {
+   "id": "ox-1-3-p4-c",
+   "lesson": "1-3",
+   "text": "他アカウントのS3へアクセスするEC2アプリには、IAMユーザーのアクセスキーをアプリへ埋め込むのが推奨される。",
+   "answer": false,
+   "explain": "インスタンスプロファイルとAssumeRoleによる一時認証情報が推奨です。"
+  },
+  {
+   "id": "ox-1-4-p1-a",
+   "lesson": "1-4",
+   "text": "A-B間とB-C間をVPCピアリングすれば、AとCは直接通信できる。",
+   "answer": false,
+   "explain": "ピアリングは推移的ではありません。"
+  },
+  {
+   "id": "ox-1-4-p1-b",
+   "lesson": "1-4",
+   "text": "CIDRが重複するVPC同士はピアリングできない。",
+   "answer": true,
+   "explain": "重複CIDRではピアリング接続を作成できません。"
+  },
+  {
+   "id": "ox-1-4-p1-c",
+   "lesson": "1-4",
+   "text": "VPCピアリングでは、ピア先VPCのNATゲートウェイを経由してインターネットへ出られる。",
+   "answer": false,
+   "explain": "エッジ間ルーティングは不可です。"
+  },
+  {
+   "id": "ox-1-4-p2-a",
+   "lesson": "1-4",
+   "text": "Transit Gatewayはリージョンリソースであり、リージョン間接続にはTGWピアリングを使う。",
+   "answer": true,
+   "explain": "TGWピアリングで別リージョンのTGWと接続します。"
+  },
+  {
+   "id": "ox-1-4-p2-b",
+   "lesson": "1-4",
+   "text": "TGWピアリングでは、BGPによる動的ルート伝播が使える。",
+   "answer": false,
+   "explain": "TGWピアリングは静的ルートのみです。"
+  },
+  {
+   "id": "ox-1-4-p2-c",
+   "lesson": "1-4",
+   "text": "検査用VPCを経由させる構成では、非対称ルーティング回避にTGWのアプライアンスモードを有効化する。",
+   "answer": true,
+   "explain": "フローを同じAZのアプライアンスに固定します。"
+  },
+  {
+   "id": "ox-1-4-p3-a",
+   "lesson": "1-4",
+   "text": "S3のゲートウェイエンドポイントは、オンプレミスからDirect Connect経由で利用できる。",
+   "answer": false,
+   "explain": "ゲートウェイ型はVPC外からは利用できません。オンプレ経由ならインターフェイス型を使います。"
+  },
+  {
+   "id": "ox-1-4-p3-b",
+   "lesson": "1-4",
+   "text": "PrivateLinkは、CIDRが重複するVPC間でもサービスを公開できる。",
+   "answer": true,
+   "explain": "特定サービスの公開であり、CIDR重複の影響を受けません。"
+  },
+  {
+   "id": "ox-1-4-p3-c",
+   "lesson": "1-4",
+   "text": "自社サービスをPrivateLinkで公開するには、提供側にNLB（またはGWLB）が必要である。",
+   "answer": true,
+   "explain": "エンドポイントサービスはNLB/GWLBに紐付けます。"
+  },
+  {
+   "id": "ox-1-4-p4-a",
+   "lesson": "1-4",
+   "text": "NATゲートウェイを1つのエグレスVPCに集約し、TGW経由で利用するとNATの数とコストを減らせる。",
+   "answer": true,
+   "explain": "集中型エグレスの典型例です。"
+  },
+  {
+   "id": "ox-1-4-p4-b",
+   "lesson": "1-4",
+   "text": "IPv6のみのサブネットからのアウトバウンド専用通信には、NATゲートウェイを使う。",
+   "answer": false,
+   "explain": "IPv6にはEgress-only インターネットゲートウェイを使います。"
+  },
+  {
+   "id": "ox-1-4-p4-c",
+   "lesson": "1-4",
+   "text": "全てのVPCの全体接続が必要な場合、PrivateLinkが最適である。",
+   "answer": false,
+   "explain": "PrivateLinkは特定サービスの公開向けです。全体接続はTGWです。"
+  },
+  {
+   "id": "ox-1-5-p1-a",
+   "lesson": "1-5",
+   "text": "Site-to-Site VPN接続は、冗長のため2本のトンネルで構成される。",
+   "answer": true,
+   "explain": "AWS側の2つのエンドポイントに対して2本張られます。"
+  },
+  {
+   "id": "ox-1-5-p1-b",
+   "lesson": "1-5",
+   "text": "VGWを使ったVPNでも、ECMPによって複数接続の帯域を束ねられる。",
+   "answer": false,
+   "explain": "ECMPはTransit Gatewayで利用できます。VGWは非対応です。"
+  },
+  {
+   "id": "ox-1-5-p1-c",
+   "lesson": "1-5",
+   "text": "Site-to-Site VPNは、安定したレイテンシと帯域を保証する。",
+   "answer": false,
+   "explain": "インターネット経由のため、保証されません。"
+  },
+  {
+   "id": "ox-1-5-p2-a",
+   "lesson": "1-5",
+   "text": "Direct Connectの回線は標準でIPsecにより暗号化される。",
+   "answer": false,
+   "explain": "標準では暗号化されません。VPN上乗せやMACsecで暗号化します。"
+  },
+  {
+   "id": "ox-1-5-p2-b",
+   "lesson": "1-5",
+   "text": "Direct Connect Gatewayを使えば、1本のDXから複数リージョンのVPCに接続できる。",
+   "answer": true,
+   "explain": "グローバルなリソースとして複数リージョンに接続可能です。"
+  },
+  {
+   "id": "ox-1-5-p2-c",
+   "lesson": "1-5",
+   "text": "即日で接続したい場合、Direct Connectの方がSite-to-Site VPNよりも適している。",
+   "answer": false,
+   "explain": "DXは開通に時間がかかるため、即時要件にはVPNが適しています。"
+  },
+  {
+   "id": "ox-1-5-p3-a",
+   "lesson": "1-5",
+   "text": "最大レジリエンスの構成では、少なくとも2つの異なるDXロケーションを使う。",
+   "answer": true,
+   "explain": "ロケーション障害にも耐えるために分けます。"
+  },
+  {
+   "id": "ox-1-5-p3-b",
+   "lesson": "1-5",
+   "text": "DXのバックアップにVPNを使う場合、同一プレフィックスならBGPでDX経路が優先される。",
+   "answer": true,
+   "explain": "既定動作でDXが優先されます。"
+  },
+  {
+   "id": "ox-1-5-p3-c",
+   "lesson": "1-5",
+   "text": "1ロケーションに2本の回線を引けば、ロケーション全体の障害にも耐えられる。",
+   "answer": false,
+   "explain": "ロケーション障害には耐えられません。"
+  },
+  {
+   "id": "ox-1-5-p4-a",
+   "lesson": "1-5",
+   "text": "数千台のリモートクライアントから安全にVPCへ接続する用途には、AWS Client VPNが適している。",
+   "answer": true,
+   "explain": "クライアント向けマネージドVPNです。"
+  },
+  {
+   "id": "ox-1-5-p4-b",
+   "lesson": "1-5",
+   "text": "TGW Connectは、GREトンネルとBGPを使ってSD-WAN機器などをTGWへ接続する。",
+   "answer": true,
+   "explain": "TGW ConnectアタッチメントはGREを使います。"
+  },
+  {
+   "id": "ox-1-5-p4-c",
+   "lesson": "1-5",
+   "text": "DXを1本引けば、高可用性要件は満たされる。",
+   "answer": false,
+   "explain": "1本では単一障害点です。冗長化が必要です。"
+  },
+  {
+   "id": "ox-1-6-p1-a",
+   "lesson": "1-6",
+   "text": "ゾーンの頂点（example.com）にはCNAMEを設定でき、ALBを指せる。",
+   "answer": false,
+   "explain": "apexにはCNAMEは使えません。エイリアスレコードを使います。"
+  },
+  {
+   "id": "ox-1-6-p1-b",
+   "lesson": "1-6",
+   "text": "位置情報ルーティングは、ユーザーの地理的な所在地に基づいて回答を切り替える。",
+   "answer": true,
+   "explain": "規制や言語対応の用途で使います。"
+  },
+  {
+   "id": "ox-1-6-p1-c",
+   "lesson": "1-6",
+   "text": "別アカウントのVPCをプライベートホストゾーンに関連付けるには、関連付け承認の作成が必要である。",
+   "answer": true,
+   "explain": "CLI/APIで承認と関連付けを行います。"
+  },
+  {
+   "id": "ox-1-6-p2-a",
+   "lesson": "1-6",
+   "text": "オンプレミスからAWS側のプライベートホストゾーンのレコードを引くには、Route 53 Resolverのインバウンドエンドポイントを使う。",
+   "answer": true,
+   "explain": "オンプレからAWSへの解決はインバウンドです。"
+  },
+  {
+   "id": "ox-1-6-p2-b",
+   "lesson": "1-6",
+   "text": "AWSからオンプレのDNSゾーンを解決するには、インバウンドエンドポイントを作成する。",
+   "answer": false,
+   "explain": "AWSからオンプレはアウトバウンドエンドポイントと転送ルールです。"
+  },
+  {
+   "id": "ox-1-6-p2-c",
+   "lesson": "1-6",
+   "text": "Resolverの転送ルールは、RAMで他アカウントへ共有できる。",
+   "answer": true,
+   "explain": "ルールをRAM共有し、各VPCに関連付けます。"
+  },
+  {
+   "id": "ox-1-6-p3-a",
+   "lesson": "1-6",
+   "text": "Route 53 Profilesを使うと、PHZやResolverルールの関連付けを複数VPCへまとめて適用できる。",
+   "answer": true,
+   "explain": "DNS設定をプロファイルにまとめて共有します。"
+  },
+  {
+   "id": "ox-1-6-p3-b",
+   "lesson": "1-6",
+   "text": "インターフェイスエンドポイントのプライベートDNS名は、エンドポイントを作成していない他のVPCでも自動的に解決される。",
+   "answer": false,
+   "explain": "そのVPC内のみ有効です。"
+  },
+  {
+   "id": "ox-1-6-p3-c",
+   "lesson": "1-6",
+   "text": "ResolverエンドポイントはENIを複数AZに配置して冗長化する。",
+   "answer": true,
+   "explain": "最低2つのIPアドレスが必要です。"
+  },
+  {
+   "id": "ox-1-7-p1-a",
+   "lesson": "1-7",
+   "text": "組織の証跡をOrganizationsで作成すると、メンバーアカウントは証跡を削除できない。",
+   "answer": true,
+   "explain": "組織の証跡はメンバーから変更できません。"
+  },
+  {
+   "id": "ox-1-7-p1-b",
+   "lesson": "1-7",
+   "text": "ログの改ざん防止には、ログアーカイブ用S3バケットにObject Lockを設定するのが有効である。",
+   "answer": true,
+   "explain": "WORMにより上書き・削除を防ぎます。"
+  },
+  {
+   "id": "ox-1-7-p1-c",
+   "lesson": "1-7",
+   "text": "CloudTrailのデータイベントは、デフォルトで記録される。",
+   "answer": false,
+   "explain": "既定では管理イベントのみです。データイベントは追加設定が必要です。"
+  },
+  {
+   "id": "ox-1-7-p2-a",
+   "lesson": "1-7",
+   "text": "Configアグリゲーターを使うと、複数アカウントの準拠状況を1つのアカウントで確認できる。",
+   "answer": true,
+   "explain": "集約ビューを提供します。"
+  },
+  {
+   "id": "ox-1-7-p2-b",
+   "lesson": "1-7",
+   "text": "「誰がセキュリティグループを変更したか」を知る最初のデータソースはConfigのみである。",
+   "answer": false,
+   "explain": "APIの呼び出し主体はCloudTrailで確認します。Configは変更前後の構成を示します。"
+  },
+  {
+   "id": "ox-1-7-p2-c",
+   "lesson": "1-7",
+   "text": "Configの自動修復には、SSM Automationのランブックが使える。",
+   "answer": true,
+   "explain": "修復アクションとして指定します。"
+  },
+  {
+   "id": "ox-1-7-p3-a",
+   "lesson": "1-7",
+   "text": "GuardDutyは、VPCフローログやDNSログを分析して脅威を検出できる。",
+   "answer": true,
+   "explain": "有効化すれば独自にこれらを分析します。"
+  },
+  {
+   "id": "ox-1-7-p3-b",
+   "lesson": "1-7",
+   "text": "S3バケット内の機密データ（PII）を検出するには、Inspectorを使う。",
+   "answer": false,
+   "explain": "PII検出はMacieです。Inspectorは脆弱性スキャンです。"
+  },
+  {
+   "id": "ox-1-7-p3-c",
+   "lesson": "1-7",
+   "text": "Security Hubは、複数サービスの検出結果をASFF形式で集約し、標準に基づく準拠スコアを提供する。",
+   "answer": true,
+   "explain": "集約と準拠チェックがSecurity Hubの役割です。"
+  },
+  {
+   "id": "ox-1-7-p4-a",
+   "lesson": "1-7",
+   "text": "Firewall Managerを使うと、組織内の全アカウントにWAFルールやセキュリティグループポリシーを一括適用できる。",
+   "answer": true,
+   "explain": "中央のポリシー適用と準拠監視が目的です。"
+  },
+  {
+   "id": "ox-1-7-p4-b",
+   "lesson": "1-7",
+   "text": "Service Catalogは、承認済みのCloudFormationテンプレートをユーザーがセルフサービスで起動できるようにする。",
+   "answer": true,
+   "explain": "ガバナンスを保ちながら標準化できます。"
+  },
+  {
+   "id": "ox-1-7-p4-c",
+   "lesson": "1-7",
+   "text": "Firewall Managerは、Organizationsを使わない単一アカウントでも全機能が利用できる。",
+   "answer": false,
+   "explain": "Organizationsとの統合が前提です。"
+  },
+  {
+   "id": "ox-1-8-p1-a",
+   "lesson": "1-8",
+   "text": "コスト配分タグは、有効化した時点より前のコストにも遡って自動的に反映される。",
+   "answer": false,
+   "explain": "有効化以降のデータが対象です。"
+  },
+  {
+   "id": "ox-1-8-p1-b",
+   "lesson": "1-8",
+   "text": "SCPで、特定のタグが付いていないリソースの作成を拒否できる。",
+   "answer": true,
+   "explain": "aws:RequestTagなどの条件キーを使います。"
+  },
+  {
+   "id": "ox-1-8-p1-c",
+   "lesson": "1-8",
+   "text": "Cost Anomaly Detectionは、機械学習で通常と異なる支出を検知して通知できる。",
+   "answer": true,
+   "explain": "SNSやメールで通知できます。"
+  },
+  {
+   "id": "ox-1-8-p2-a",
+   "lesson": "1-8",
+   "text": "AWS Budgetsは、予算超過時にSCPやIAMポリシーを自動でアタッチする予算アクションを実行できる。",
+   "answer": true,
+   "explain": "予算アクションで対応が可能です。"
+  },
+  {
+   "id": "ox-1-8-p2-b",
+   "lesson": "1-8",
+   "text": "AWS Budgetsは、予算上限に達するとAWSリソースの課金を必ず自動停止する。",
+   "answer": false,
+   "explain": "通知とアクションが中心で、ハードリミットではありません。"
+  },
+  {
+   "id": "ox-1-8-p2-c",
+   "lesson": "1-8",
+   "text": "一括請求によって、組織全体の使用量が合算されボリューム割引が適用される。",
+   "answer": true,
+   "explain": "一括請求の主要な利点です。"
+  },
+  {
+   "id": "ox-1-8-p3-a",
+   "lesson": "1-8",
+   "text": "リソース単位・時間単位の最も詳細なコスト分析にはCURを使う。",
+   "answer": true,
+   "explain": "CURが最も詳細なデータセットです。"
+  },
+  {
+   "id": "ox-1-8-p3-b",
+   "lesson": "1-8",
+   "text": "CURをS3に出力してAthenaでクエリする構成が可能である。",
+   "answer": true,
+   "explain": "Athena統合が公式にサポートされています。"
+  },
+  {
+   "id": "ox-1-8-p3-c",
+   "lesson": "1-8",
+   "text": "Cost Explorerは、リソース単位のコストを時間単位でSQLクエリできる。",
+   "answer": false,
+   "explain": "それはCUR+Athenaの用途です。"
+  }
+ ],
+ "mc": [
+  {
+   "id": "mc-1-001",
+   "stem": "ある金融会社は、AWS Organizationsで200以上のアカウントを運用しています。コンプライアンス部門は、どのアカウントの管理者であっても、AWS CloudTrailの証跡の停止・削除、およびAWS Configのレコーダー停止を行えないようにしたいと考えています。ただし、セキュリティチームが管理する専用ロールだけは例外的に操作できる必要があります。運用負荷を最小限にしてこの要件を満たすソリューションはどれですか。",
+   "items": [],
+   "choices": [
+    "Organizationsの管理アカウントで、CloudTrail・Configの停止/削除操作を拒否し、セキュリティチームのロールのみ条件で除外するSCPをルートに適用する。",
+    "各アカウントのIAMロールに権限境界を設定し、CloudTrailとConfigの停止を拒否する。",
+    "AWS Configルールで証跡の停止を検出し、Lambdaで再有効化する。",
+    "各メンバーアカウントのIAMポリシーに、CloudTrailとConfigの停止操作を拒否するステートメントを追加し、StackSetsで配布する。"
+   ],
+   "answer": 1,
+   "explain": [
+    "正解。SCPは全メンバーアカウントのプリンシパル（ルートユーザー含む）に強制され、aws:PrincipalArn条件で特定ロールだけ除外できます。",
+    "権限境界はアカウント管理者が外せる場合があり、組織レベルの強制にはなりません。",
+    "検出と再有効化は事後対応であり、停止を防ぐ要件を満たしません。",
+    "IAMポリシーの配布は個別アカウントの管理者が自分で変更・削除できるため、強制力がありません。"
+   ],
+   "tip": "「全アカウントで誰にも許さない」は予防的統制=SCP。例外は条件キーで除外する。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-002",
+   "stem": "ある企業はAWS Organizationsの管理アカウントで、承認されたリージョン（東京とバージニア北部）以外のリージョンでのリソース作成を禁止するSCPを作成しました。適用後、開発者から「IAMロールの作成やCloudFrontディストリビューションの設定ができなくなった」という報告がありました。原因と最適な対処はどれですか。",
+   "items": [],
+   "choices": [
+    "管理アカウントでFullAWSAccessのSCPがデタッチされている。FullAWSAccessを再アタッチする。",
+    "CloudFrontとIAMはリージョンの概念を持たないため、SCPの対象外である。Support に問い合わせる。",
+    "SCPはIAMの操作に対して適用されない仕様のため、IAM側のポリシーの不具合である。",
+    "IAMやCloudFrontなどのグローバルサービスは特定リージョンのエンドポイントを使うため、aws:RequestedRegion条件で拒否される。これらのグローバルサービスのアクションをNotActionで除外するようSCPを修正する。"
+   ],
+   "answer": 4,
+   "explain": [
+    "FullAWSAccessがない場合は全面拒否となり、報告された症状とは異なります。リージョン拒否の副作用が原因です。",
+    "SCPはグローバルサービスにも適用され、エンドポイントのリージョンが評価されます。",
+    "SCPはIAM操作にも適用されます。",
+    "正解。グローバルサービスはus-east-1等で処理されるため、リージョン拒否SCPでは例外が必要です。"
+   ],
+   "tip": "リージョン制限SCPはグローバルサービスをNotActionで除外するのが定石。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-003",
+   "stem": "ソリューションアーキテクトが、新規にマルチアカウント環境を構築します。要件は、(1)ベストプラクティスに沿ったOU・ログアーカイブ・監査アカウントの自動構築、(2)新規アカウントを標準構成で素早く払い出すセルフサービス、(3)予防的・発見的ガードレールの提供です。カスタム開発を最小にする方法はどれですか。",
+   "items": [],
+   "choices": [
+    "AWS Service Catalogのみを使い、アカウント作成をLambdaで自動化する。",
+    "IAM Identity Centerで各アカウントを作成し、権限セットでガードレールを実装する。",
+    "AWS Control Towerでランディングゾーンを構築し、Account Factoryでアカウントを払い出す。",
+    "Organizationsを手動で構成し、CloudFormationでSCPとConfigルールを作成する。"
+   ],
+   "answer": 3,
+   "explain": [
+    "Service Catalog単体ではランディングゾーンやガードレールは提供されません。",
+    "Identity Centerはアクセス管理で、アカウント払い出しやガードレールの機能は持ちません。",
+    "正解。Control Towerは要件を標準機能で満たします。",
+    "手動構成は可能ですが、開発・運用の負荷が大きくなります。"
+   ],
+   "tip": "『最小のカスタム開発でマルチアカウント基盤』=Control Tower。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-004",
+   "stem": "ある会社はAWS Control Towerでランディングゾーンを運用しています。CloudFormationテンプレートがデプロイされる前に、暗号化されていないEBSボリュームを含むスタックを検出して拒否したいと考えています。どのタイプのコントロールを有効化すべきですか。",
+   "items": [],
+   "choices": [
+    "予防的コントロール（SCPによる実装）",
+    "IAM Access Analyzerによるポリシー検証",
+    "プロアクティブコントロール（CloudFormation Hooksによる実装）",
+    "発見的コントロール（AWS Configルールによる実装）"
+   ],
+   "answer": 3,
+   "explain": [
+    "SCPはAPI呼び出しを拒否しますが、デプロイ前のテンプレート検査ではありません。",
+    "Access Analyzerはポリシーや外部公開の分析用です。",
+    "正解。プロアクティブコントロールはプロビジョニング前にテンプレートを評価し、違反なら失敗させます。",
+    "Configルールは作成後に違反を検出します。"
+   ],
+   "tip": "『デプロイ前に』=プロアクティブ(CFn Hooks)。『作成後に検出』=発見的(Config)。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-005",
+   "stem": "ある組織は、20のアカウントのVPCにあるEC2からオンプレミスのActive Directoryへ名前解決を行う必要があります。オンプレミスとはDirect Connectで接続済みです。オンプレミスのDNSからもAWS側のプライベートホストゾーンのレコードを解決させたいと考えています。DNSの運用を最小にする設計はどれですか。",
+   "items": [],
+   "choices": [
+    "共有サービスVPCにRoute 53 Resolverのインバウンド/アウトバウンドエンドポイントを作成し、転送ルールをRAMで組織に共有して各VPCに関連付ける。",
+    "各VPCにDNSサーバーのEC2を立て、条件付きフォワーダーを設定する。",
+    "オンプレミスのホストファイルに全レコードを登録する。",
+    "各VPCのDHCPオプションセットでオンプレミスDNSのIPを指定する。"
+   ],
+   "answer": 1,
+   "explain": [
+    "正解。双方向解決をマネージドで集約でき、ルール共有で多数VPCに展開できます。",
+    "EC2のDNSサーバーは運用・可用性の負荷が高くなります。",
+    "運用が非現実的で動的な更新に対応できません。",
+    "DHCPオプションでオンプレDNSを指すと、AWS側のプライベートゾーン解決ができなくなる懸念があり、双方向の要件を満たしません。"
+   ],
+   "tip": "AWS→オンプレ=アウトバウンド+転送ルール、オンプレ→AWS=インバウンド。ルールはRAM共有。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-006",
+   "stem": "ある企業のSaaSベンダーのアカウントが、顧客のAWSアカウント内のリソースを読み取るためにクロスアカウントロールを引き受けます。セキュリティ担当者は、他の顧客がベンダーを経由して自分のロールARNを推測し不正に引き受けさせる「confused deputy」問題を防止したいと考えています。最も適切な対策はどれですか。",
+   "items": [],
+   "choices": [
+    "ベンダーにIAMユーザーとアクセスキーを発行する。",
+    "ロールの信頼ポリシーに、ベンダーが顧客ごとに一意に割り当てるExternalIdの条件を追加する。",
+    "ロールにAdministratorAccessを付与し、MFAを必須にする。",
+    "ロールの最大セッション時間を12時間に延長する。"
+   ],
+   "answer": 2,
+   "explain": [
+    "長期認証情報は避けるべきで、問題の解決にもなりません。",
+    "正解。ExternalIdにより、ベンダーが正しい顧客コンテキストでのみロールを引き受けられます。",
+    "過剰権限であり、混乱した代理問題の解決にもなりません。",
+    "セッション時間の延長は関係がなく、セキュリティを下げます。"
+   ],
+   "tip": "サードパーティにロールを渡す=ExternalId。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-007",
+   "stem": "ある会社は数百のVPCを複数のアカウントとリージョンに持ち、オンプレミスとも接続する必要があります。本番VPCと開発VPCは互いに通信させず、どちらも共有サービスVPCとオンプレミスにだけ通信できるようにしたいと考えています。運用の簡素さとセグメンテーションを両立する設計はどれですか。",
+   "items": [],
+   "choices": [
+    "各VPCをPrivateLinkで接続する。",
+    "全VPC間をフルメッシュのVPCピアリングで接続し、セキュリティグループで本番と開発を分離する。",
+    "全VPCを1つのTransit VPC上のソフトウェアVPNで接続する。",
+    "Transit Gatewayに全VPCを接続し、本番用・開発用の2つのルートテーブルを作成して、関連付けと伝播を制御する。"
+   ],
+   "answer": 4,
+   "explain": [
+    "PrivateLinkは特定サービスの公開向けで、全体のネットワーク接続には不向きです。",
+    "フルメッシュは管理が破綻し、ルートでの分離もできません。",
+    "Transit VPCは運用負荷が高く、現在はTGWが推奨です。",
+    "正解。TGWの複数ルートテーブルでセグメンテーションができます。"
+   ],
+   "tip": "TGWの関連付け(association)と伝播(propagation)でセグメント化。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-008",
+   "stem": "あるSaaS企業は、自社のAPIサービスを数百の顧客AWSアカウントのVPCからプライベートに利用できるようにしたいと考えています。顧客VPCのCIDRはしばしば重複しており、顧客VPCから自社VPCの他のリソースへは到達させたくありません。最も適切な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "顧客VPCごとにVPCピアリングを作成する。",
+    "Transit Gatewayを共有し、全顧客VPCを接続する。",
+    "自社サービスの前にNLBを配置してエンドポイントサービスを作成し、顧客がインターフェイスVPCエンドポイントで接続する。",
+    "パブリックALBを公開し、顧客のIPをセキュリティグループで許可する。"
+   ],
+   "answer": 3,
+   "explain": [
+    "CIDR重複ではピアリングできず、VPC全体が見える懸念があります。",
+    "TGWはCIDR重複に不向きで、ネットワーク全体を接続する形になります。",
+    "正解。PrivateLinkはCIDR重複に影響されず、特定サービスのみ一方向に公開できます。",
+    "インターネット経由であり、プライベート要件を満たしません。"
+   ],
+   "tip": "『CIDR重複』『サービスのみ公開』『多数の顧客』=PrivateLink。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-009",
+   "stem": "ある企業のオンプレミスのデータセンターとAWSを接続します。要件は、(1)安定した帯域と低レイテンシ、(2)転送中のデータの暗号化、(3)複数のリージョンにある複数のVPCへの接続です。最も適切な構成はどれですか。",
+   "items": [],
+   "choices": [
+    "Direct Connect接続のパブリックVIF上でIPsec VPNを構成し、AWS側はVGWで終端する。",
+    "Direct Connect Gatewayとトランジットゲートウェイを使い、トランジットVIF上でSite-to-Site VPN（IPsec）を構成する。",
+    "インターネット経由のSite-to-Site VPNを各VPCのVGWへ作成する。",
+    "Direct Connect接続にプライベートVIFを作成し、1つのVPCに接続する。"
+   ],
+   "answer": 2,
+   "explain": [
+    "VGW宛のパブリックVIF上VPNは構成が異なり、複数リージョン接続の要件には不適です。",
+    "正解。DX Gateway+TGWで複数リージョンのVPCに接続でき、DX上VPNで暗号化できます。",
+    "安定した帯域・低レイテンシを満たしません。",
+    "暗号化と複数リージョンの要件を満たしません。"
+   ],
+   "tip": "DXは暗号化なし。暗号化=DX上のIPsec VPN(またはMACsec)。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-010",
+   "stem": "ある企業はDirect Connectの専用線を1本、東京のロケーションに引いています。ビジネス上、接続は重要で、ロケーション障害にも耐え、DXの障害時は自動的にインターネットVPNに切り替えたいと考えています。最も適切な設計はどれですか。",
+   "items": [],
+   "choices": [
+    "VPNだけに切り替える。",
+    "別のDXロケーションに2本目のDX回線を追加し、さらにSite-to-Site VPNをバックアップとして構成し、BGPでDXを優先する。",
+    "同じロケーションにもう1本回線を追加する。",
+    "DXの帯域を10Gbpsに増速する。"
+   ],
+   "answer": 2,
+   "explain": [
+    "DX の利点が失われます。",
+    "正解。ロケーション分散とVPNバックアップで要件を満たします。",
+    "同一ロケーション障害に耐えられません。",
+    "帯域の増強は可用性の対策になりません。"
+   ],
+   "tip": "『高可用性』=ロケーション分散。DX障害のバックアップ=VPN。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-011",
+   "stem": "組織内の全アカウントでGuardDutyを有効にし、検出結果を1つのセキュリティアカウントに集約したいと考えています。今後作成されるアカウントにも自動で有効化したい場合、最も運用負荷の低い方法はどれですか。",
+   "items": [],
+   "choices": [
+    "各アカウントのCloudWatch LogsにGuardDutyの結果を出力する。",
+    "Organizationsの管理アカウントでGuardDutyの委任管理者としてセキュリティアカウントを指定し、新規アカウントの自動有効化を設定する。",
+    "各アカウントで手動でGuardDutyを有効化し、招待を送る。",
+    "Lambdaで毎日全アカウントをスキャンして有効化する。"
+   ],
+   "answer": 2,
+   "explain": [
+    "集約・自動有効化の要件を満たしません。",
+    "正解。委任管理者と自動有効化が標準的な方法です。",
+    "手動作業はスケールせず、漏れが出ます。",
+    "独自実装が不要です。"
+   ],
+   "tip": "組織統合サービスは『委任管理者＋自動有効化』が定石。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-012",
+   "stem": "セキュリティチームは、複数アカウント・複数リージョンにある、GuardDuty、Inspector、Macieの検出結果をまとめて確認し、CIS基準への準拠状況をスコアで把握したいと考えています。どのサービスを使うべきですか。",
+   "items": [],
+   "choices": [
+    "AWS Artifact",
+    "AWS Trusted Advisor",
+    "AWS Security Hub",
+    "Amazon Detective"
+   ],
+   "answer": 3,
+   "explain": [
+    "Artifactはコンプライアンスレポートの入手用です。",
+    "Trusted Advisorは推奨事項チェックで、検出結果の集約ではありません。",
+    "正解。Security Hubは検出結果の集約と標準に基づく準拠チェックを提供します。",
+    "Detectiveは調査・根本原因分析のサービスです。"
+   ],
+   "tip": "『集約＋準拠スコア』=Security Hub。『調査』=Detective。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-013",
+   "stem": "ある会社は、全アカウントで、新規作成されるすべてのセキュリティグループに特定のポートの公開を禁止するルールを強制し、違反を自動で修復したいと考えています。新規アカウントにも自動適用される必要があります。最適なサービスはどれですか。",
+   "items": [],
+   "choices": [
+    "アカウントごとのNACL",
+    "AWS Firewall Managerのセキュリティグループ監査/使用ポリシー",
+    "AWS WAF",
+    "AWS Shield Standard"
+   ],
+   "answer": 2,
+   "explain": [
+    "NACLは組織への一括適用機能を持ちません。",
+    "正解。Firewall Managerはセキュリティグループポリシーを組織に適用し、自動修復も可能です。",
+    "WAFはHTTP層の保護です。",
+    "Shield StandardはDDoS保護で、SGの統制とは関係ありません。"
+   ],
+   "tip": "組織へのSG/WAF/DNS Firewallの一括強制=Firewall Manager。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-014",
+   "stem": "開発・テスト用のSandbox OUには50個のアカウントがあり、開発者が自由にリソースを作成できます。月次予算を超えると、予期せぬ高額請求につながっています。予算超過時に、さらなるリソース作成を人手を介さず自動的に防止したいと考えています。運用負荷を最小限にする最も適切な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "Cost Explorerで毎日確認する。",
+    "Trusted Advisorのコスト最適化チェックを有効にする。",
+    "Cost and Usage Reportを生成する。",
+    "AWS Budgetsで予算アクションを設定し、しきい値超過時にSCPまたはIAMポリシーを適用して作成を拒否する。"
+   ],
+   "answer": 4,
+   "explain": [
+    "手動確認は自動防止になりません。",
+    "Trusted Advisorは推奨の提示のみです。",
+    "CURは分析用のデータです。",
+    "正解。予算アクションでポリシー適用や停止を自動実行できます。"
+   ],
+   "tip": "『超過時に自動で制限』=Budgetsの予算アクション。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-015",
+   "stem": "財務部門は、各事業部のAWSコストを、アカウントを横断して「事業部」タグで集計したいと考えています。タグはすでにリソースに付与されていますが、Cost Explorerで事業部タグによる分割ができません。原因として最も可能性が高いものはどれですか。",
+   "items": [],
+   "choices": [
+    "タグがコスト配分タグとして有効化されていない。",
+    "一括請求が有効でない。",
+    "Cost Explorerはタグをサポートしていない。",
+    "タグの値が大文字ではない。"
+   ],
+   "answer": 1,
+   "explain": [
+    "正解。コスト配分タグは有効化して初めて請求データに反映されます。",
+    "一括請求の有無とは別の問題です。",
+    "Cost Explorerはタグによるグループ化をサポートします。",
+    "大文字小文字は問題ではなく、有効化の問題です。"
+   ],
+   "tip": "タグが付いていても『コスト配分タグの有効化』が必要。遡及しない。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-016",
+   "stem": "ある会社は、個々のEC2インスタンスやS3プレフィックス単位の時間別コスト分析を行い、事業部へチャージバックするためのデータをSQLで分析したいと考えています。データは数十アカウント分で月々増加し続けるため、サーバー管理を避けつつ、経営層向けのダッシュボードも提供する必要があります。最も適切な構成はどれですか。",
+   "items": [],
+   "choices": [
+    "Cost and Usage ReportをS3に出力し、Athenaでクエリし、QuickSightで可視化する",
+    "Cost ExplorerのCSVエクスポート",
+    "AWS Budgetsのレポート",
+    "Trusted Advisor"
+   ],
+   "answer": 1,
+   "explain": [
+    "正解。CURは最も詳細で、Athena統合が標準でサポートされます。",
+    "Cost Explorerは粒度や分析の柔軟性に限界があります。",
+    "Budgetsは予算監視用です。",
+    "Trusted Advisorは推奨チェックです。"
+   ],
+   "tip": "最も詳細・SQL分析=CUR+Athena。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-017",
+   "stem": "社内の従業員がAWS管理コンソールとCLIで複数アカウントを利用します。ユーザーは既存の外部IdP（SAML 2.0）で管理されており、ユーザーとグループの変更を自動で反映し、長期のアクセスキーを使わせたくありません。最も適切な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "各アカウントにIAMユーザーを作成する。",
+    "各アカウントにSAML IdPを個別に登録し、ロールを手動で作成する。",
+    "Cognitoユーザープールを使用する。",
+    "IAM Identity Centerに外部IdPを接続し、SCIMで同期し、許可セットをグループに割り当てる。"
+   ],
+   "answer": 4,
+   "explain": [
+    "IAMユーザーは長期認証情報となり管理負荷が高くなります。",
+    "個別構成は運用負荷が大きく、同期もされません。",
+    "Cognitoは顧客向けアプリの認証です。",
+    "正解。SSOと自動プロビジョニングを実現できます。"
+   ],
+   "tip": "従業員のSSO+自動同期=Identity Center+SCIM。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-018",
+   "stem": "あるデータ分析会社は、アカウントAのLambdaがアカウントBのS3バケットのオブジェクトを読み取り、KMSカスタマー管理キーで暗号化されたデータを復号する必要があります。AccessDeniedが発生しています。必要な設定を満たす最も適切な対応はどれですか。",
+   "items": [],
+   "choices": [
+    "SCPで許可する。",
+    "アカウントBのバケットポリシーでAのロールを許可するのみで十分である。",
+    "バケットポリシーとKMSキーポリシーでAのロールを許可し、Aのロールのidポリシーにも許可を付与する。",
+    "アカウントAのKMSキーでデータを再暗号化する必要はなく、S3のACLを公開にする。"
+   ],
+   "answer": 3,
+   "explain": [
+    "SCPは権限を付与できません。",
+    "KMS側の許可も必要です。",
+    "正解。S3・KMS・呼び出し側のIDポリシーの許可が必要です。",
+    "バケットのパブリック化は不適切です。"
+   ],
+   "tip": "クロスアカウント+KMS=キーポリシー側の許可も忘れずに。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-019",
+   "stem": "ある企業のネットワークチームは、VPCを一元管理し、各アプリケーションチームのアカウントは共有されたサブネットにEC2とRDSだけを起動できるようにしたいと考えています。VPC数、NAT、VPN接続を減らしたい状況です。最適な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "VPCピアリングで接続する。",
+    "PrivateLinkで接続する。",
+    "アカウントごとにVPCを作成しTGWで接続する。",
+    "ネットワークアカウントのVPCサブネットをAWS RAMで組織に共有する。"
+   ],
+   "answer": 4,
+   "explain": [
+    "VPC数や管理が増えます。",
+    "サービス公開向けの機能です。",
+    "要件のVPC削減を満たしません。",
+    "正解。VPC共有によりネットワーク構成を集約できます。"
+   ],
+   "tip": "VPC共有=RAM。参加アカウントはルート/サブネットを変更できない。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-020",
+   "stem": "オンプレミスのサーバー（AWS外）から、AWS APIを呼び出す必要があります。長期のアクセスキーをサーバーに保存したくありません。X.509証明書の基盤（PKI）が社内にあります。最も適切な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "IAM Roles Anywhereに信頼アンカーとして社内CAを登録し、一時認証情報を取得する。",
+    "EC2インスタンスプロファイルをオンプレミスに設定する。",
+    "IAMユーザーを作成しアクセスキーを保存する。",
+    "Cognito IDプールを使う。"
+   ],
+   "answer": 1,
+   "explain": [
+    "正解。証明書で一時認証情報を取得できます。",
+    "インスタンスプロファイルはEC2用です。",
+    "要件に反します。",
+    "モバイル/Webアプリ向けです。"
+   ],
+   "tip": "オンプレのワークロード+証明書=IAM Roles Anywhere。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-021",
+   "stem": "ある会社は、全リージョン・全アカウントのAPIアクティビティを、改ざん不可能な形で1年間保持し、監査人がSQLで調査できるようにしたいと考えています。アカウント数は100を超え、新規アカウントにも自動で適用されること、運用負荷を抑えることも求められています。最も適切な構成はどれですか。",
+   "items": [],
+   "choices": [
+    "組織の証跡をログアーカイブアカウントのS3バケット（SSE-KMS、Object Lock、ログ検証有効）に出力し、Athenaで分析する。",
+    "EC2に保存する。",
+    "CloudWatch Logsにのみ保存する。",
+    "各アカウントで個別の証跡を作成する。"
+   ],
+   "answer": 1,
+   "explain": [
+    "正解。要件を標準機能で満たします。",
+    "耐久性・管理の面で不適切です。",
+    "保持・改ざん防止・SQL要件に十分ではありません。",
+    "統一管理・改ざん防止になりません。"
+   ],
+   "tip": "改ざん防止=Object Lock+別アカウント隔離+ログ検証。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-022",
+   "stem": "あるグローバル企業が、ユーザーの所在国に応じて異なるリージョンのALBへ振り分け、データ主権を満たしたいと考えています。ユーザーはどの国からアクセスするかで確実に固定されるべきです。どのルーティングポリシーを使うべきですか。",
+   "items": [],
+   "choices": [
+    "レイテンシールーティング",
+    "加重ルーティング",
+    "位置情報ルーティング",
+    "フェイルオーバールーティング"
+   ],
+   "answer": 3,
+   "explain": [
+    "レイテンシは遅延が最小のリージョンで、国の固定ではありません。",
+    "割合配分用です。",
+    "正解。位置情報ルーティングは国・大陸等のユーザー所在地に基づきます。",
+    "アクティブ/パッシブ用です。"
+   ],
+   "tip": "『所在国で固定』=位置情報。『最速』=レイテンシー。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-023",
+   "stem": "アカウントが急増しており、新しいアカウントを作成するたびに、標準のネットワーク（VPC、TGWアタッチメント）、ロール、ログ設定を一貫して適用したいと考えています。Control Towerを使用しています。追加のカスタマイズに最も適した方法はどれですか。",
+   "items": [],
+   "choices": [
+    "IAM Identity Centerの許可セットを使用する。",
+    "手動で各アカウントを設定する。",
+    "新しいOrganizationsを作成する。",
+    "Account Factory for Terraform（AFT）またはAccount Factory Customizationを利用し、カスタマイズをコードで自動適用する。"
+   ],
+   "answer": 4,
+   "explain": [
+    "アクセス制御であり、アカウント設定の配布ではありません。",
+    "再現性がありません。",
+    "不必要で、既存構成を捨てることになります。",
+    "正解。Control Towerのアカウント払い出しにカスタマイズを自動適用できます。"
+   ],
+   "tip": "Control Towerのカスタマイズ=AFT/AFC/CfCT。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-024",
+   "stem": "ある会社は、複数のアカウントのVPCから、ゲートウェイ型エンドポイントを使ってS3にアクセスしています。オンプレミスからDirect Connect経由でも、インターネットを経由せずにS3へアクセスしたいと考えています。最も適切な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "ゲートウェイエンドポイントのルートをオンプレミスにアドバタイズする。",
+    "S3のインターフェイスVPCエンドポイントを作成し、オンプレミスからDirect Connect経由でそのエンドポイントのDNS名/IPへ接続する。",
+    "S3のパブリックエンドポイントを使う。",
+    "VPCピアリングを追加する。"
+   ],
+   "answer": 2,
+   "explain": [
+    "ゲートウェイ型はVPC外から利用できません。",
+    "正解。S3にはオンプレから使えるインターフェイスエンドポイントがあります。",
+    "要件に反します。",
+    "ピアリングはオンプレからのアクセスを解決しません。"
+   ],
+   "tip": "ゲートウェイ型=VPC内のみ。オンプレ経由=インターフェイス型。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-025",
+   "stem": "ある企業は、DXで接続した本社とAWSの複数アカウントのVPCの間を、できるだけ少ない構成要素で接続したいと考えています。VPCは3リージョンにまたがり、100以上のVPCがあります。最適な構成はどれですか。",
+   "items": [],
+   "choices": [
+    "リージョンごとにTransit Gatewayを作成してVPCを接続し、TGW同士をピアリングし、Direct Connect Gatewayとトランジットゲートウェイを関連付ける。",
+    "各VPCにVGWを作成し、プライベートVIFを100本作成する。",
+    "全VPCをフルメッシュでピアリングする。",
+    "VPNを100本作成する。"
+   ],
+   "answer": 1,
+   "explain": [
+    "正解。TGWとDX Gatewayの組み合わせでスケールします。",
+    "VIFの数や管理が現実的でありません。",
+    "オンプレミス接続を解決しません。",
+    "運用が破綻します。"
+   ],
+   "tip": "多数VPC+DX=TGW+DX Gateway(トランジットVIF)。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-026",
+   "stem": "ある企業はOrganizationsを使用しています。今後、本番OUのアカウントで、セキュリティ要件を満たすために、SCPの設計を行います。SCPの動作について正しい記述を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "SCPはメンバーアカウントのルートユーザーにも適用される。",
+    "SCPは管理アカウントのIAMユーザーにも適用される。",
+    "SCPはサービスリンクロールには適用されない。",
+    "SCPは許可を付与し、IAMポリシーが不要になる。",
+    "SCPをOUにアタッチすると、そのOUの子OUには適用されない。"
+   ],
+   "answers": [
+    1,
+    3
+   ],
+   "select": 2,
+   "explain": [
+    "正解。メンバーのルートユーザーにも適用されます。",
+    "管理アカウントには適用されません。",
+    "正解。サービスリンクロールはSCPの影響を受けません。",
+    "SCPは許可を付与しません。",
+    "子OUにも継承されます。"
+   ],
+   "tip": "SCP：管理アカウントには効かない、メンバーのrootには効く、SLRには効かない。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-027",
+   "stem": "ある企業はハイブリッドDNSを設計しています。VPCのEC2はオンプレミスの「corp.example.com」を解決でき、オンプレミスのクライアントはAWSのプライベートホストゾーン「aws.example.internal」を解決できる必要があります。必要な構成を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "Route 53 Resolverのアウトバウンドエンドポイントと、corp.example.com向けの転送ルールを作成する。",
+    "Route 53 Resolverのインバウンドエンドポイントを作成し、オンプレミスDNSからaws.example.internalをそのIPへ条件付き転送する。",
+    "VPCのDHCPオプションセットでオンプレミスDNSのみを指定する。",
+    "パブリックホストゾーンにプライベートIPを登録する。",
+    "Transit Gatewayのマルチキャストを有効化する。"
+   ],
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2,
+   "explain": [
+    "正解。AWS→オンプレにはアウトバウンド+ルール。",
+    "正解。オンプレ→AWSにはインバウンドを使います。",
+    "AWS側のプライベート名の解決が失われます。",
+    "不適切で、情報漏えいの懸念もあります。",
+    "DNSとは関係ありません。"
+   ],
+   "tip": "方向とエンドポイントの対応を即答できるようにする。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-028",
+   "stem": "ある会社は、新規アカウントにも自動的に適用されるセキュリティ統制を設計しています。要件は、(a)すべてのアカウントでConfigルールによる準拠評価を行う、(b)組織全体でEBSの暗号化なしボリューム作成を防止する、(c)セキュリティ検出結果の集約です。適切な組み合わせを3つ選択してください。",
+   "items": [],
+   "choices": [
+    "組織のConfigルールまたはコンフォーマンスパックを展開する。",
+    "SCPで、暗号化されていないEBSボリュームの作成を拒否する。",
+    "Security Hubの委任管理者を設定し、自動有効化と集約リージョンを設定する。",
+    "各アカウントで手動でConfigを有効化する。",
+    "IAMユーザーごとに権限境界を設定する。",
+    "メンバーアカウントのCloudWatchダッシュボードを作成する。"
+   ],
+   "answers": [
+    1,
+    2,
+    3
+   ],
+   "select": 3,
+   "explain": [
+    "正解。組織単位で展開できます。",
+    "正解。予防的統制としてSCPを使います。",
+    "正解。集約と自動有効化に対応します。",
+    "手動で、新規アカウントへの自動適用になりません。",
+    "組織全体の統制になりません。",
+    "統制や集約の要件を満たしません。"
+   ],
+   "tip": "『新規アカウントにも自動』=組織統合の機能（委任管理者・自動有効化・組織ルール）。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-029",
+   "stem": "ある企業は、Transit Gatewayを使った集中型エグレス検査アーキテクチャを構築しています。スポークVPCのトラフィックは、検査VPCのファイアウォールアプライアンスを経由してインターネットへ出ます。アプライアンスが複数のAZにあり、戻りのトラフィックが別のAZのアプライアンスへ送られてフローが破棄される問題が発生しています。解決策を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "検査VPCのTGWアタッチメントでアプライアンスモードを有効にする。",
+    "スポークVPCのCIDRを変更する。",
+    "TGWのルートテーブルを、検査VPCへ向けた0.0.0.0/0のスタティックルートで構成し、検査VPCのアタッチメントにスポークの伝播をする。",
+    "ECMPを無効にする。",
+    "NATゲートウェイをすべて削除する。"
+   ],
+   "answers": [
+    1,
+    3
+   ],
+   "select": 2,
+   "explain": [
+    "正解。同じフローを同じAZに固定します。",
+    "CIDRは非対称ルーティングの原因ではありません。",
+    "正解。スポーク側からのデフォルトルートで検査VPCへ集約し、戻りのためのルーティングを整えます。",
+    "ECMPは関係がありません。",
+    "エグレスが成立しなくなります。"
+   ],
+   "tip": "TGW検査でフローが落ちる=アプライアンスモード。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-030",
+   "stem": "ある企業は、組織全体のコストを管理するために、次の施策を検討しています。コスト管理の観点で有効な施策を3つ選択してください。",
+   "items": [],
+   "choices": [
+    "コスト配分タグを有効化し、タグポリシーとSCPで必須タグを統制する。",
+    "AWS Budgetsで部門ごとの予算と実績・予測のアラートを設定する。",
+    "Cost Anomaly Detectionを有効化する。",
+    "管理アカウントでワークロードを実行し、一括請求を無効にする。",
+    "すべてのアカウントでルートユーザーのアクセスキーを使用する。",
+    "Savings Plansの共有を一切禁止する。"
+   ],
+   "answers": [
+    1,
+    2,
+    3
+   ],
+   "select": 3,
+   "explain": [
+    "正解。タグ統制はコスト配分の基礎です。",
+    "正解。予算と予測アラートを設定できます。",
+    "正解。異常を自動検知できます。",
+    "ベストプラクティスに反し、割引面でも不利です。",
+    "重大なセキュリティ違反です。",
+    "コスト最適化に不利です。"
+   ],
+   "tip": "コスト：タグ（有効化）→Budgets→Anomaly→CUR の流れで考える。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-031",
+   "stem": "ある会社は、アカウントBのS3バケットにアカウントAのアプリケーションがオブジェクトを書き込むようにしています。その結果、バケット所有者であるアカウントBがオブジェクトを読めない問題があります。適切な対処を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "バケットのオブジェクト所有権をBucketOwnerEnforced（ACL無効化）に設定する。",
+    "アカウントAのアプリに、PutObject時にbucket-owner-full-controlのACLを付与するよう変更する（ACLを有効のままにする場合）。",
+    "アカウントBのバケットをパブリックにする。",
+    "アカウントBのルートユーザーのアクセスキーをAに共有する。",
+    "S3バージョニングを無効にする。"
+   ],
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2,
+   "explain": [
+    "正解。ACLを無効化すると所有者がオブジェクトを所有します。",
+    "正解。ACL運用を継続する場合は、所有者へのフルコントロールを付与します。",
+    "セキュリティ上不適切です。",
+    "重大なセキュリティ違反です。",
+    "問題と無関係です。"
+   ],
+   "tip": "クロスアカウント書込み後の所有権=BucketOwnerEnforced。",
+   "domain": 1
+  },
+  {
+   "id": "mc-1-032",
+   "stem": "ある企業は、新設するアカウントのネットワークを標準化するために、AWS RAMを使います。RAMで共有可能なリソースとして、正しいものを2つ選択してください。",
+   "items": [],
+   "choices": [
+    "VPCのサブネット",
+    "Transit Gateway",
+    "S3バケット（バケット全体）",
+    "SQSキュー",
+    "IAMユーザー"
+   ],
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2,
+   "explain": [
+    "正解。VPC共有の対象です。",
+    "正解。TGWはRAM共有できます。",
+    "S3はリソースポリシーで共有します（RAMのリソースではありません）。",
+    "SQSはリソースポリシーで共有します。",
+    "IAMユーザーは共有対象ではありません。"
+   ],
+   "tip": "RAM=サブネット/TGW/Resolverルール等。S3/SQS/SNS等はリソースポリシー。",
+   "domain": 1
+  }
+ ]
+}

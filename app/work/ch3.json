@@ -1,0 +1,1682 @@
+{
+ "no": 3,
+ "title": "既存ソリューションの継続的改善",
+ "lessons": [
+  {
+   "id": "3-1",
+   "title": "監視・可観測性（CloudWatch / X-Ray / CloudTrail / Config）",
+   "pages": [
+    {
+     "id": "3-1-p1",
+     "title": "CloudWatch：メトリクス・アラーム・ログ",
+     "html": "\n<h4>メトリクスとアラーム</h4>\n<ul>\n<li>標準メトリクスは無料で自動収集。EC2は既定で5分間隔、詳細モニタリングで<b class=\"key\">1分間隔</b>（有料）</li>\n<li>EC2の<span class=\"trap\">メモリ使用率・ディスク使用率・プロセス情報はOSの内側の値</span>なので標準では取れない → CloudWatch Agentで収集（カスタムメトリクス）</li>\n<li>高解像度メトリクスは最短<b class=\"key\">1秒</b>。アラームも高解像度（10秒/30秒）が設定可能</li>\n<li>アラーム状態は OK / ALARM / INSUFFICIENT_DATA。アクションは SNS、Auto Scaling、EC2アクション（停止・終了・再起動・復旧）、Systems Manager OpsItem など</li>\n<li>複合アラーム（Composite alarm）：複数アラームをAND/ORで束ね、<b class=\"key\">アラーム疲れ（ノイズ）を減らす</b></li>\n<li>異常検出（Anomaly Detection）：機械学習で期待値バンドを作り、固定しきい値が難しい周期的な負荷に有効</li>\n</ul>\n<h4>CloudWatch Logs</h4>\n<ul>\n<li>ロググループの保持期間は<span class=\"trap\">既定で無期限</span>（＝課金され続ける）→ 保持期間を設定してコスト削減</li>\n<li>メトリクスフィルター：ログ中のパターンをメトリクス化 → アラーム（例：ERROR件数、root利用）</li>\n<li><b class=\"key\">サブスクリプションフィルター</b>：リアルタイムでKinesis Data Streams / Data Firehose / Lambda / OpenSearchへ転送。アカウント横断の集約にも使う</li>\n<li>Logs Insights：ログへの対話型クエリ（アドホック調査）。S3へのエクスポートは非同期でリアルタイムではない</li>\n<li>複数アカウント・リージョンの横断監視は<b class=\"key\">CloudWatch クロスアカウントオブザーバビリティ（OAM）</b>で、監視アカウントから各ソースアカウントのメトリクス・ログ・トレースを参照</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-1-p1-a",
+      "ox-3-1-p1-b",
+      "ox-3-1-p1-c"
+     ]
+    },
+    {
+     "id": "3-1-p2",
+     "title": "X-Ray・Synthetics・RUM：アプリの可視化",
+     "html": "\n<h4>分散トレーシング</h4>\n<ul>\n<li><b class=\"key\">AWS X-Ray</b>：リクエストをサービス間で追跡し、サービスマップでレイテンシ・エラー率・ボトルネックを特定。マイクロサービスの「どこが遅いか」はX-Ray</li>\n<li>計装は X-Ray SDK または <b class=\"key\">AWS Distro for OpenTelemetry（ADOT）</b>。Lambdaは「アクティブトレース」を有効化するだけ。ECS/EC2ではX-Rayデーモン/ADOTコレクターが必要</li>\n<li>サンプリングルールで記録率を調整（全リクエスト記録はコスト増）。アノテーションは検索可能、メタデータは検索不可</li>\n<li><b class=\"key\">CloudWatch Application Signals</b>：SLO（可用性・レイテンシ目標）をアプリ視点で定義・追跡</li>\n</ul>\n<h4>合成監視と実ユーザー監視</h4>\n<ul>\n<li>CloudWatch Synthetics（カナリア）：スクリプトで定期的にURL/APIを叩き、<b class=\"key\">ユーザーがいない時間帯でも</b>可用性を検知</li>\n<li>CloudWatch RUM：実ユーザーのブラウザからページ性能・JSエラーを収集</li>\n<li><b class=\"key\">Contributor Insights</b>：ログから「上位N個の寄与者」（例：特定IPのリクエスト急増）を可視化</li>\n</ul>\n<p><span class=\"trap\">引っ掛け</span>：「サービス間の呼び出しの遅延箇所を特定」→ X-Ray。「リソース全体の負荷」→ CloudWatchメトリクス。「誰がAPIを呼んだか」→ CloudTrail。</p>\n",
+     "oxIds": [
+      "ox-3-1-p2-a",
+      "ox-3-1-p2-b",
+      "ox-3-1-p2-c"
+     ]
+    },
+    {
+     "id": "3-1-p3",
+     "title": "CloudTrail と AWS Config の使い分け",
+     "html": "\n<h4>CloudTrail ＝ 「誰が・いつ・何のAPIを呼んだか」</h4>\n<ul>\n<li><b class=\"key\">管理イベント</b>は既定で記録され、コンソールのイベント履歴は過去90日分。長期保管・分析には証跡（Trail）をS3へ作成</li>\n<li><b class=\"key\">データイベント</b>（S3オブジェクトレベル、Lambda Invoke、DynamoDBアイテム等）は<span class=\"trap\">既定で無効・有料</span>。必要なものだけ有効化</li>\n<li>組織の証跡（Organization trail）で全アカウント分を管理アカウント/委任管理者から一括有効化。<b class=\"key\">ログファイルの整合性検証</b>で改ざん検知</li>\n<li>CloudTrail Lake：イベントをマネージドなストアに保存し、SQLで直接クエリ（Athena構築不要）</li>\n<li>CloudTrail Insights：異常なAPI呼び出し量・エラー率を検知</li>\n</ul>\n<h4>AWS Config ＝ 「リソースの設定が今どうで、どう変わったか」</h4>\n<ul>\n<li>設定履歴・タイムラインを記録し、<b class=\"key\">Configルール</b>で準拠/非準拠を評価（マネージド/カスタムLambda）</li>\n<li>適合パック（Conformance pack）でルール群を一括展開、<b class=\"key\">アグリゲーター</b>で複数アカウント/リージョンを集約</li>\n<li>非準拠はSSM Automationによる自動修復に接続できる（例：公開S3をプライベートに戻す）</li>\n<li>高度なクエリでSQL風にリソース設定を横断検索</li>\n</ul>\n<p><span class=\"trap\">引っ掛け</span>：Configは「設定の変更」を記録するが「誰が」変更したかはCloudTrailと突き合わせる。Configは<b class=\"key\">予防ではなく検知</b>（SCPやIAMが予防）。</p>\n",
+     "oxIds": [
+      "ox-3-1-p3-a",
+      "ox-3-1-p3-b",
+      "ox-3-1-p3-c"
+     ]
+    },
+    {
+     "id": "3-1-p4",
+     "title": "監視設計の判断表",
+     "html": "\n<table>\n<tr><th>要件</th><th>選ぶサービス</th></tr>\n<tr><td>CPU・ネットワーク等の傾向とアラーム</td><td>CloudWatch メトリクス/アラーム</td></tr>\n<tr><td>メモリ・ディスク・アプリログ</td><td>CloudWatch Agent / Logs</td></tr>\n<tr><td>ログ内の特定文字列で通知</td><td>メトリクスフィルター + アラーム</td></tr>\n<tr><td>ログをリアルタイムで別アカウントやOpenSearchへ</td><td>サブスクリプションフィルター</td></tr>\n<tr><td>サービス間の遅延箇所の特定</td><td>X-Ray / Application Signals</td></tr>\n<tr><td>ユーザー不在でも可用性確認</td><td>Synthetics</td></tr>\n<tr><td>API操作の監査（誰が何をした）</td><td>CloudTrail（Lakeでクエリ）</td></tr>\n<tr><td>設定変更履歴・コンプライアンス</td><td>Config</td></tr>\n<tr><td>AWS側の障害・メンテ通知</td><td>AWS Health / Health Dashboard（EventBridge連携）</td></tr>\n<tr><td>複数アカウント横断の一元可視化</td><td>CloudWatch OAM / 組織の証跡 / Config アグリゲーター</td></tr>\n</table>\n<h4>アラート経路の定石</h4>\n<ul>\n<li>通知：アラーム → SNS → メール/Slack（<b class=\"key\">Amazon Q Developer in chat applications</b>＝旧AWS Chatbot）</li>\n<li>自動対応：アラーム/イベント → <b class=\"key\">EventBridge</b> → Lambda / SSM Automation / Step Functions</li>\n<li><span class=\"trap\">アラーム設定の落とし穴</span>：欠損データ処理（<b class=\"key\">TreatMissingData</b>）を誤ると、停止したインスタンスでINSUFFICIENT_DATAのまま通知されない。ハートビート的指標は「欠損＝異常（breaching）」にする</li>\n<li>運用の目標は「人が気づく」前に<b class=\"key\">自動検知→自動修復</b>。通知だけで終わる設計より、修復まで自動化する案が試験では選ばれやすい</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-1-p4-a",
+      "ox-3-1-p4-b"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3-2",
+   "title": "自動化と自動修復（EventBridge / Systems Manager）",
+   "pages": [
+    {
+     "id": "3-2-p1",
+     "title": "EventBridge：イベント駆動の司令塔",
+     "html": "\n<ul>\n<li>ルール：イベントパターン（イベントに反応）またはスケジュール（cron/rate）で、最大5つのターゲット（Lambda、SQS、SNS、Step Functions、SSM Automation、ECSタスク、別バス等）を呼び出す</li>\n<li>AWSサービスのイベント（EC2状態変化、GuardDuty検出、Config非準拠、CodePipeline状態、AWS Health）は<b class=\"key\">デフォルトイベントバス</b>に自動で流れる</li>\n<li>カスタムバスはアプリ独自イベント用。<b class=\"key\">SaaSパートナーバス</b>も存在。<b class=\"key\">クロスアカウント/リージョン</b>は、バスのリソースポリシーで許可し別バスへ転送</li>\n<li>アーカイブ & リプレイ：過去イベントを保存して再送（障害後の再処理、テスト）</li>\n<li><b class=\"key\">EventBridge Scheduler</b>：大量・一回限り・タイムゾーン指定のスケジュール。定期実行のたびに別ルールを作る必要がない</li>\n<li>EventBridge Pipes：SQS/Kinesis/DynamoDBストリーム等 → フィルタ・エンリッチ → ターゲットを、コード少なめで接続</li>\n<li>失敗時は<b class=\"key\">DLQ（SQS）とリトライポリシー</b>をターゲットに設定可能</li>\n</ul>\n<p><span class=\"trap\">引っ掛け</span>：CloudWatch Eventsは旧名称でEventBridgeと同じ基盤。「イベントでLambdaを起動」「定期バッチ起動」は第一候補がEventBridge。ただしキューイングによる負荷平準化・再試行制御が主眼ならSQSを併用。</p>\n",
+     "oxIds": [
+      "ox-3-2-p1-a",
+      "ox-3-2-p1-b",
+      "ox-3-2-p1-c"
+     ]
+    },
+    {
+     "id": "3-2-p2",
+     "title": "Systems Manager：運用の自動化ツール群",
+     "html": "\n<table>\n<tr><th>機能</th><th>用途・判断</th></tr>\n<tr><td><b class=\"key\">Run Command</b></td><td>多数インスタンスへSSH不要でコマンドをアドホック実行。結果はS3/CloudWatch Logsへ</td></tr>\n<tr><td>Session Manager</td><td><b class=\"key\">SSH/踏み台/22番ポート開放不要</b>でシェル接続。IAM制御・CloudTrail/セッションログ監査。VPCエンドポイントでプライベート運用可</td></tr>\n<tr><td>Patch Manager</td><td>パッチベースライン + パッチグループ + メンテナンスウィンドウで計画パッチ適用。コンプライアンス報告</td></tr>\n<tr><td><b class=\"key\">State Manager</b></td><td>望ましい構成（エージェント導入、設定）を継続的に強制・ドリフト修正</td></tr>\n<tr><td>Automation</td><td>ランブックで多段階の運用手順（AMI作成、インスタンス再起動、修復）を自動化。承認ステップ・クロスアカウント実行可</td></tr>\n<tr><td><b class=\"key\">Parameter Store</b></td><td>設定値・秘密情報の階層管理。標準は無料。ローテーション機能は無い</td></tr>\n<tr><td>Inventory</td><td>ソフト/設定のインベントリ収集</td></tr>\n<tr><td>OpsCenter / Explorer</td><td>運用上の課題（OpsItem）を集約し調査・対応</td></tr>\n</table>\n<ul>\n<li>前提：SSM Agentがインスタンスにあり、インスタンスプロファイル（AmazonSSMManagedInstanceCore）で権限付与。プライベートサブネットならインターネット経路かVPCエンドポイント（ssm, ssmmessages, ec2messages）が必要</li>\n<li><b class=\"key\">ハイブリッドアクティベーション</b>でオンプレサーバーも管理対象にできる</li>\n<li><span class=\"trap\">秘密情報の判断</span>：自動ローテーションが必要 → Secrets Manager。単純な設定値・低コスト → Parameter Store</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-2-p2-a",
+      "ox-3-2-p2-b",
+      "ox-3-2-p2-c"
+     ]
+    },
+    {
+     "id": "3-2-p3",
+     "title": "自動修復（Auto-Remediation）の定石",
+     "html": "\n<h4>パターン集</h4>\n<ul>\n<li>EC2の障害：CloudWatchアラーム（StatusCheckFailed_System）→ EC2アクション「復旧」。同一IP・EBSそのままで別ホストで再起動（インスタンスストアは非対応）</li>\n<li><b class=\"key\">ASGヘルスチェック</b>：EC2ステータスに加え、ELBヘルスチェックを有効化しないと「アプリが応答しないだけ」のインスタンスが置換されない</li>\n<li><b class=\"key\">Config非準拠</b>→ Configルールの修復アクション（SSM Automation）（例：暗号化なしEBS検出、公開S3のBlock Public Access有効化）</li>\n<li><b class=\"key\">GuardDuty検出</b>→ EventBridge → Lambda/SSM Automation（例：侵害疑いのインスタンスを隔離SGへ変更しスナップショット取得）</li>\n<li>AWS Healthイベント（計画メンテナンス、RDS更新、EC2リタイア予定）→ EventBridge → 通知/自動対応</li>\n<li><b class=\"key\">CloudFormationスタックのドリフト</b>→ 通知後に再デプロイ。手動変更を許さない運用が理想</li>\n</ul>\n<h4>設計の判断基準</h4>\n<ul>\n<li>冪等（何度実行しても同じ結果）な修復にする。連続発火でループしないようガードする</li>\n<li>修復は最小権限のIAMロール（Automation Assume Role）で実行し、実行履歴をCloudTrailで監査</li>\n<li>承認が必要な高リスク操作はAutomationの<b class=\"key\">承認アクション</b>やStep Functionsで人手を挟む</li>\n<li><span class=\"trap\">引っ掛け</span>：Lambdaを自作するより、SSM Automationの既製ランブックがある場合は「運用オーバーヘッド最小」で優先されることが多い</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-2-p3-a",
+      "ox-3-2-p3-b",
+      "ox-3-2-p3-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3-3",
+   "title": "CI/CDとデプロイ戦略（CodePipeline / CodeDeploy）",
+   "pages": [
+    {
+     "id": "3-3-p1",
+     "title": "CodePipeline と CodeBuild",
+     "html": "\n<ul>\n<li>CodePipeline：ソース → ビルド → テスト → 承認 → デプロイをオーケストレーションするマネージドCD。ソースは S3、ECR、GitHub（CodeConnections経由）など。<span class=\"trap\">CodeCommitは新規顧客受付を終了</span>しているため、新規構成ではGitHub等が前提</li>\n<li>CodeBuild：サーバーレスのビルド実行環境。<b class=\"key\">buildspec.yml</b>（phases: install/pre_build/build/post_build、artifacts、cache）。VPC内リソース（プライベートDB等）にアクセスするにはVPC設定が必要。ローカルキャッシュ/S3キャッシュでビルド高速化</li>\n<li>手動承認アクション：本番デプロイ前にSNS通知＋承認。<b class=\"key\">クロスアカウントデプロイ</b>：パイプラインが別アカウントのロールをAssumeし、成果物バケットとKMSキーのポリシーでアクセス許可（成果物はCMKで暗号化する必要がある）</li>\n<li>クロスリージョンアクション：リージョンごとに成果物バケットを用意</li>\n<li>パイプライン実行の失敗/成功は<b class=\"key\">EventBridge</b>で検知して通知・ロールバックへ</li>\n<li>CodeBuildでのシークレットは平文の環境変数にせず、Secrets Manager / Parameter Store参照を使う</li>\n</ul>\n<h4>テスト・セキュリティの組み込み</h4>\n<ul>\n<li>ビルドステージで単体テスト、<b class=\"key\">CodeGuru Reviewer</b>やInspector（ECR/Lambdaスキャン）で静的解析/脆弱性検査</li>\n<li>CloudFormationデプロイ時はテストステージに<b class=\"key\">変更セット</b>の確認を挟む</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-3-p1-a",
+      "ox-3-3-p1-b",
+      "ox-3-3-p1-c"
+     ]
+    },
+    {
+     "id": "3-3-p2",
+     "title": "CodeDeploy：デプロイ戦略と自動ロールバック",
+     "html": "\n<table>\n<tr><th>対象</th><th>方式</th></tr>\n<tr><td>EC2/オンプレ</td><td>In-place（既存を更新。ASGでローリング的に）/ Blue/Green（新ASGを作り、ELBのトラフィックを切替、旧は保持後に終了）</td></tr>\n<tr><td>Lambda</td><td>エイリアスの重み付けシフト：<b class=\"key\">Canary</b>（例 10%を5分→残り全て）/ Linear（例 10%を1分ごと）/ <b class=\"key\">AllAtOnce</b></td></tr>\n<tr><td>ECS</td><td>Blue/Greenのみ。ALBのリスナー/ターゲットグループ切替。Canary / Linear / AllAtOnce</td></tr>\n</table>\n<ul>\n<li>AppSpecファイルとライフサイクルフック（BeforeInstall、AfterInstall、ApplicationStart、<b class=\"key\">ValidateService</b>、Lambda/ECSでは BeforeAllowTraffic/AfterAllowTraffic）で検証を挟む</li>\n<li>自動ロールバック：デプロイ失敗時、または<b class=\"key\">CloudWatchアラームがALARM</b>になった時に自動で前バージョンへ戻す</li>\n<li>デプロイ設定：EC2/In-placeは AllAtOnce / HalfAtATime / OneAtATime</li>\n<li>Blue/Greenの利点：<b class=\"key\">瞬時にロールバック</b>（旧環境へトラフィックを戻す）、本番同等環境でテスト可能。欠点：一時的にリソースが倍</li>\n</ul>\n<p><span class=\"trap\">引っ掛け</span>：ECSでCodeDeployのBlue/Greenを使う場合のデプロイコントローラーは「CODE_DEPLOY」。ECS標準のローリング更新は「ECS」コントローラー。In-placeはダウンタイム・容量低下が発生しうる。</p>\n",
+     "oxIds": [
+      "ox-3-3-p2-a",
+      "ox-3-3-p2-b",
+      "ox-3-3-p2-c"
+     ]
+    },
+    {
+     "id": "3-3-p3",
+     "title": "デプロイ戦略の使い分け（ダウンタイムとリスク）",
+     "html": "\n<table>\n<tr><th>戦略</th><th>特徴</th><th>主な実現手段</th></tr>\n<tr><td>All at once</td><td>最速・ダウンタイムあり・ロールバックは再デプロイ</td><td>Beanstalk / CodeDeploy</td></tr>\n<tr><td>Rolling</td><td>バッチ更新、容量一時低下</td><td>Beanstalk Rolling / ASG Instance Refresh</td></tr>\n<tr><td>Rolling with additional batch</td><td>追加バッチで容量維持</td><td>Beanstalk</td></tr>\n<tr><td><b class=\"key\">Immutable</b></td><td>新ASGに新規インスタンス。失敗時は新ASGを破棄するだけ、ロールバック容易</td><td>Beanstalk</td></tr>\n<tr><td>Traffic splitting</td><td>新旧へ一定割合で流す（カナリア評価）</td><td>Beanstalk</td></tr>\n<tr><td>Blue/Green</td><td>別環境を作り切替。即時戻し</td><td>CodeDeploy / Beanstalk URLスワップ / Route 53</td></tr>\n<tr><td><b class=\"key\">カナリア</b></td><td>少数ユーザーで検証後に全展開</td><td>ALB重み付けTG、Route 53加重、Lambdaエイリアス、API Gatewayカナリアステージ</td></tr>\n</table>\n<ul>\n<li><b class=\"key\">Route 53加重ルーティング</b>での切替は<span class=\"trap\">DNSのTTL・クライアントキャッシュで完全に即時にならない</span>。即時性が必要ならALBの加重ターゲットグループ</li>\n<li>ASG Instance Refresh：起動テンプレート更新後に、最小正常率を保ちつつインスタンスを段階的に入れ替え</li>\n<li><b class=\"key\">AWS AppConfig</b>：コード再デプロイなしに設定/フィーチャーフラグを段階配信し、アラーム連動で自動ロールバック</li>\n<li>データベーススキーマ変更は<b class=\"key\">後方互換（expand/contract）</b>にしないとBlue/Greenで旧環境へ戻せない</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-3-p3-a",
+      "ox-3-3-p3-b",
+      "ox-3-3-p3-c"
+     ]
+    },
+    {
+     "id": "3-3-p4",
+     "title": "AMI・コンテナの供給網とパイプライン運用",
+     "html": "\n<ul>\n<li><b class=\"key\">EC2 Image Builder</b>：OSパッチ・ソフト導入・テストを含むAMI/コンテナイメージの自動ビルドパイプライン。スケジュールまたは親イメージ更新で起動。配布先リージョン/アカウントを指定、Inspectorで脆弱性スキャン</li>\n<li><b class=\"key\">Golden AMI</b>方式：起動が速く再現性が高いが、更新（パッチ）の頻度に合わせたAMI再作成が必要。一方、起動時にユーザーデータで都度構成する方式は柔軟だが起動が遅く外部依存で失敗しうる</li>\n<li>Amazon ECR：イメージのスキャン（Inspector強化スキャン）、<b class=\"key\">ライフサイクルポリシー</b>で古いイメージ削除、クロスリージョン/アカウントレプリケーション、プルスルーキャッシュ</li>\n<li>CloudFormation + CodePipeline：テンプレート変更を変更セット→承認→実行する<b class=\"key\">インフラのCI/CD</b></li>\n<li>パイプラインのIAM：ステージごとに最小権限のサービスロールを分離。本番アカウントへは<b class=\"key\">クロスアカウントロール</b></li>\n</ul>\n<h4>試験での選び方</h4>\n<ul>\n<li>「ダウンタイムなし・すぐ戻せる」→ Blue/Green</li>\n<li>「少数で検証し徐々に展開」→ カナリア/Linear</li>\n<li>「追加コスト最小で更新」→ ローリング</li>\n<li>「パッチ適用済みAMIを継続供給」→ Image Builder</li>\n<li><span class=\"trap\">「手動手順を減らす」「繰り返し可能」</span>という文言が出たらIaC+CI/CDの自動化が答え</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-3-p4-a",
+      "ox-3-3-p4-b"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3-4",
+   "title": "IaCと構成管理（CloudFormation / StackSets / CDK）",
+   "pages": [
+    {
+     "id": "3-4-p1",
+     "title": "CloudFormation の更新・失敗・保護",
+     "html": "\n<ul>\n<li><b class=\"key\">変更セット（Change Set）</b>：更新前に影響（追加/変更/置換 Replacement/削除）を確認。本番更新の定石</li>\n<li>DeletionPolicy：Retain / Snapshot（RDS、EBS等）/ Delete。<b class=\"key\">UpdateReplacePolicy</b>は更新で置換された旧リソースの扱い。DBは両方 Snapshot or Retain にしてデータ消失を防ぐ</li>\n<li><b class=\"key\">スタックポリシー</b>：更新時に特定リソースの変更を禁止。終了保護：スタック削除の誤操作防止</li>\n<li>ロールバック：作成失敗→ROLLBACK_COMPLETE（再作成するには削除が必要）。更新失敗→UPDATE_ROLLBACK_COMPLETE。ロールバック自体が失敗（UPDATE_ROLLBACK_FAILED）したら、原因を直して<b class=\"key\">ContinueUpdateRollback</b>（問題リソースをスキップ可能）</li>\n<li>CreationPolicy + cfn-signal：EC2/ASGでアプリの起動完了シグナルを待つ（WaitConditionより推奨）。タイムアウト時は作成失敗</li>\n<li><b class=\"key\">カスタムリソース</b>：テンプレートにない処理をLambda等で実装。応答（ResponseURLへ）を返さないと<span class=\"trap\">最大1時間ハング</span>するので、必ずSUCCESS/FAILEDを返す（削除時も）</li>\n<li>ネストスタック：共通部品の再利用・500リソース上限の回避。クロススタック参照はExport/Fn::ImportValue（<span class=\"trap\">参照されているExportは削除・変更不可</span>）</li>\n<li><b class=\"key\">動的参照</b>：{{resolve:ssm:...}}、{{resolve:secretsmanager:...}}でテンプレートに秘密値を直書きしない</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-4-p1-a",
+      "ox-3-4-p1-b",
+      "ox-3-4-p1-c"
+     ]
+    },
+    {
+     "id": "3-4-p2",
+     "title": "StackSets とマルチアカウント展開",
+     "html": "\n<ul>\n<li><b class=\"key\">StackSets</b>：1つのテンプレートを複数アカウント × 複数リージョンへ一括デプロイ・更新</li>\n<li><b class=\"key\">サービスマネージド</b>権限：AWS Organizationsと統合。OU単位で指定し、<b class=\"key\">自動デプロイ</b>（新規アカウントがOUに入ると自動適用）。IAMロールの事前作成不要。管理アカウントまたは委任管理者から実行</li>\n<li><b class=\"key\">セルフマネージド</b>権限：管理者アカウントに AWSCloudFormationStackSetAdministrationRole、ターゲットに AWSCloudFormationStackSetExecutionRole を自分で用意。Organizations外のアカウントにも使える</li>\n<li>オペレーション設定：同時実行アカウント数、障害許容数/率、リージョン順序でリスクを抑えた段階展開</li>\n<li>用途：全アカウントへのConfigルール、CloudTrail、IAMロール、ガードレールの一括展開</li>\n<li>Control Tower：ランディングゾーン構築とガードレール（予防SCP/検出Config）を自動化。アカウントの量産はAccount Factory</li>\n</ul>\n<table>\n<tr><th>要件</th><th>手段</th></tr>\n<tr><td>新規アカウント作成時に自動でベースライン適用</td><td>StackSets（サービスマネージド+自動デプロイ）/ Control Tower</td></tr>\n<tr><td>複数リージョンに同一スタック</td><td>StackSets</td></tr>\n<tr><td>承認済みテンプレートだけを開発者に提供</td><td>Service Catalog</td></tr>\n</table>\n<p><span class=\"trap\">引っ掛け</span>：「各アカウントで手動実行」「アカウント毎にスクリプト」より、組織統合のStackSetsが運用負荷最小。</p>\n",
+     "oxIds": [
+      "ox-3-4-p2-a",
+      "ox-3-4-p2-b",
+      "ox-3-4-p2-c"
+     ]
+    },
+    {
+     "id": "3-4-p3",
+     "title": "ドリフト検出とリソースインポート",
+     "html": "\n<ul>\n<li><b class=\"key\">ドリフト</b>＝CloudFormationの外（コンソールやCLI）で行われた手動変更による、実際の設定とテンプレートの差異</li>\n<li><b class=\"key\">ドリフト検出</b>：スタック/リソース単位で実行し、IN_SYNC / DRIFTED を判定。<span class=\"trap\">検出するだけで自動修復はしない</span>。修復は、手動変更を戻す、またはテンプレート側を更新して反映</li>\n<li>StackSetsにもドリフト検出がある。<b class=\"key\">定期的な検出</b>はEventBridge + Lambda / Config（cloudformation-stack-drift-detection-check ルール）で自動化</li>\n<li><b class=\"key\">リソースインポート</b>：既存リソースをスタックの管理下に取り込む（DeletionPolicyの指定が必要）。IaC化の移行に使う</li>\n<li>Configはスタック外の変更も含め全リソースの設定変更を記録。CloudFormationドリフトは「テンプレートとの差」、Configは「時系列の変更履歴・ルール評価」</li>\n<li>予防策：本番のIAMから直接変更権限を外し、変更はパイプライン経由のみにする（SCP / IAM）</li>\n</ul>\n<h4>ドリフト検出が検出しにくい/できないもの</h4>\n<ul>\n<li>すべてのリソースタイプが対象ではない（非対応タイプあり）</li>\n<li>テンプレートに明示していないプロパティの既定値からの変更は、対象外のことがある</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-4-p3-a",
+      "ox-3-4-p3-b"
+     ]
+    },
+    {
+     "id": "3-4-p4",
+     "title": "CDK・SAM・Service Catalog の位置づけ",
+     "html": "\n<ul>\n<li><b class=\"key\">AWS CDK</b>：TypeScript/Python/Java等のプログラミング言語でインフラを定義し、cdk synthでCloudFormationテンプレートを生成、<b class=\"key\">cdk deploy</b>で展開。最終的にCloudFormationスタックになる（＝ロールバック、ドリフト検出が使える）</li>\n<li>コンストラクト：L1（CFNリソースそのまま、Cfn接頭辞）/ L2（既定値・便利メソッド付き）/ <b class=\"key\">L3（パターン）</b>（複数リソースのまとまり）</li>\n<li>cdk bootstrap：環境（アカウント/リージョン）ごとに、アセット用S3やデプロイ用ロールを作る前提作業</li>\n<li><b class=\"key\">AWS SAM</b>：サーバーレス向けのCloudFormation拡張（Transform: AWS::Serverless-2016-10-31）。sam localでローカルテスト、sam deploy。CodeDeployと連携してLambdaのカナリア（DeploymentPreference）を簡単に実装</li>\n<li><b class=\"key\">Service Catalog</b>：承認済みテンプレート（製品）のポートフォリオを提供し、エンドユーザーはセルフサービスで起動。起動制約（Launch constraint）のIAMロールで、ユーザー本人に強い権限を与えずにデプロイさせる</li>\n<li>Terraform等もあるが、試験の選択肢の基本はCloudFormation/CDK</li>\n</ul>\n<h4>判断</h4>\n<ul>\n<li>「開発者がループや条件を使い、既存言語で記述したい」→ CDK</li>\n<li>「サーバーレスアプリを簡潔に」→ SAM</li>\n<li>「統制された構成のセルフサービス提供」→ Service Catalog</li>\n<li>「全アカウントに一括」→ StackSets</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-4-p4-a",
+      "ox-3-4-p4-b",
+      "ox-3-4-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3-5",
+   "title": "Well-Architectedレビュー・信頼性・パフォーマンス改善",
+   "pages": [
+    {
+     "id": "3-5-p1",
+     "title": "Well-Architected Framework の6本柱とレビュー",
+     "html": "\n<table>\n<tr><th>柱</th><th>キーワード</th></tr>\n<tr><td><b class=\"key\">運用上の優秀性</b></td><td>IaC、小さく頻繁な可逆変更、運用手順の自動化、障害から学ぶ</td></tr>\n<tr><td>セキュリティ</td><td>強いID基盤、最小権限、トレーサビリティ、全層防御、データ保護、自動化</td></tr>\n<tr><td>信頼性</td><td>障害からの自動復旧、水平スケール、容量推測の停止、変更管理の自動化</td></tr>\n<tr><td><b class=\"key\">パフォーマンス効率</b></td><td>先進技術の民主化（マネージド利用）、グローバル展開、サーバーレス、実験</td></tr>\n<tr><td>コスト最適化</td><td>使った分だけ支払う、全体効率の測定、無差別な重労働への支出を止める、使用状況の分析</td></tr>\n<tr><td><b class=\"key\">持続可能性</b></td><td>影響の把握、利用率の最大化、効率的なハードウェア（Graviton等）・マネージドサービス利用</td></tr>\n</table>\n<h4>レビューの道具</h4>\n<ul>\n<li>AWS Well-Architected Tool：質問に回答してワークロードを評価し、HRI（高リスク項目）と改善計画を出力。<b class=\"key\">レンズ</b>（SaaS、サーバーレス、金融サービス等）で観点を追加。マイルストーンで改善を記録</li>\n<li>Trusted Advisor：コスト最適化・パフォーマンス・セキュリティ・耐障害性・サービス制限・運用上の優秀性のチェック。全チェックの利用には<b class=\"key\">Business / Enterprise系サポート</b>が必要</li>\n<li>AWS Health：自アカウントに影響するイベント。Compute Optimizer：適正サイズ推奨</li>\n</ul>\n<p><span class=\"trap\">引っ掛け</span>：Well-Architected Toolは診断・助言のツールであり、リソースを自動修正しない。トレードオフ（例：コスト vs 信頼性）は要件の優先度で決める。</p>\n",
+     "oxIds": [
+      "ox-3-5-p1-a",
+      "ox-3-5-p1-b",
+      "ox-3-5-p1-c"
+     ]
+    },
+    {
+     "id": "3-5-p2",
+     "title": "信頼性の改善：Multi-AZ・DR・疎結合",
+     "html": "\n<h4>DR戦略（RTO/RPOとコストのトレードオフ）</h4>\n<table>\n<tr><th>戦略</th><th>RTO/RPO</th><th>内容</th></tr>\n<tr><td><b class=\"key\">バックアップ & リストア</b></td><td>時間〜日</td><td>最安。別リージョンへバックアップコピー（AWS Backup）</td></tr>\n<tr><td>パイロットライト</td><td>数十分〜</td><td>DBレプリカ等のコアのみ常時稼働。障害時に残りを起動</td></tr>\n<tr><td>ウォームスタンバイ</td><td>分</td><td>縮小版のフル環境が常時稼働。拡張して切替</td></tr>\n<tr><td><b class=\"key\">マルチサイト Active/Active</b></td><td>ほぼ0</td><td>全リージョンで本番稼働。最高コスト</td></tr>\n</table>\n<ul>\n<li>Aurora Global Database：リージョン間レプリケーション遅延は通常1秒未満。計画外フェイルオーバーでRPO秒単位、RTOは分単位。DynamoDBグローバルテーブルはマルチリージョンActive/Active</li>\n<li><b class=\"key\">Route 53ヘルスチェック + フェイルオーバー/レイテンシールーティング</b>、Global Accelerator（DNSキャッシュに依存せず高速切替）</li>\n<li>AWS Elastic Disaster Recovery：オンプレ/他環境のサーバーを継続レプリケーションし、低コストでDR</li>\n<li>RDS Multi-AZ（同期レプリケーションで可用性）と<b class=\"key\">リードレプリカ</b>（非同期で読取スケール）は目的が違う。<span class=\"trap\">Multi-AZ（標準）のスタンバイは読み取りに使えない</span></li>\n</ul>\n<h4>疎結合・耐障害設計</h4>\n<ul>\n<li>SQS / SNS / EventBridgeで非同期化、DLQで失敗隔離、<b class=\"key\">指数バックオフ + ジッター</b>でリトライ集中を回避</li>\n<li>ヘルスチェック + Auto Scaling、AWS Fault Injection Serviceでカオス実験し弱点を検証</li>\n<li><b class=\"key\">サービスクォータ</b>の事前確認（DR先でも上限緩和を）</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-5-p2-a",
+      "ox-3-5-p2-b",
+      "ox-3-5-p2-c"
+     ]
+    },
+    {
+     "id": "3-5-p3",
+     "title": "パフォーマンス改善：ボトルネック特定とキャッシュ・レプリカ",
+     "html": "\n<h4>1. まず測る</h4>\n<ul>\n<li>CloudWatch（CPU/ネットワーク/IOPS）、X-Ray（サービス間レイテンシ）、<b class=\"key\">RDS/Aurora Performance Insights</b>（DB負荷＝DBロード、待機イベント、重いSQL）、DevOps Guru（異常検知と推奨）、Compute Optimizer（サイズ・種類の推奨）</li>\n</ul>\n<h4>2. 層ごとの改善</h4>\n<table>\n<tr><th>症状</th><th>対策</th></tr>\n<tr><td>静的/動的コンテンツの遠距離レイテンシ</td><td><b class=\"key\">CloudFront</b>（キャッシュ、オリジンシールド）、グローバルなら Global Accelerator</td></tr>\n<tr><td>DB読取過多</td><td>リードレプリカ（Auroraは最大15、レプリカAuto Scalingも可。RDS MySQL/MariaDB/PostgreSQLも最大15）、<b class=\"key\">ElastiCache</b>（Redis/Valkey, Memcached）</td></tr>\n<tr><td>DynamoDB読取のマイクロ秒化</td><td>DAX（アプリのコード変更はクライアント差し替え程度）</td></tr>\n<tr><td>API Gatewayの繰り返し呼び出し</td><td>ステージのキャッシュ有効化</td></tr>\n<tr><td>Lambda→RDSの接続枯渇</td><td><b class=\"key\">RDS Proxy</b>（接続プーリング、フェイルオーバー時間も短縮）</td></tr>\n<tr><td>DB書込みが限界</td><td>スケールアップ、Aurora、シャーディング、非同期化（SQS）、DynamoDB</td></tr>\n</table>\n<ul>\n<li>キャッシュ戦略：Lazy loading（キャッシュミス時に格納、古くなりうる）/ Write-through（書込み時に更新、常に新しいが無駄なキャッシュも）。Redisは永続化・レプリケーション・フェイルオーバー・多様なデータ型、Memcachedはシンプル・マルチスレッド</li>\n<li><span class=\"trap\">引っ掛け</span>：リードレプリカは<b class=\"key\">読み取り</b>のみ改善。書き込み性能・可用性（自動フェイルオーバー）の解決にはならない（Auroraは例外的にレプリカへフェイルオーバー可能）</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-5-p3-a",
+      "ox-3-5-p3-b",
+      "ox-3-5-p3-c"
+     ]
+    },
+    {
+     "id": "3-5-p4",
+     "title": "ストレージ・ネットワーク・スケーリングの最適化",
+     "html": "\n<h4>ストレージ</h4>\n<ul>\n<li>EBS：gp3は容量と独立にIOPS（基準3,000、最大16,000）・スループットを指定でき、gp2より安価。高IOPS・低レイテンシのDB向けはio2 / io2 Block Express（Multi-Attach対応）。スループット重視は st1、コールドは sc1</li>\n<li><b class=\"key\">インスタンスストア</b>：最高速だが一時的（停止・終了で消える）。キャッシュ・バッファ用途</li>\n<li>S3：プレフィックスあたり 3,500 PUT/5,500 GET 毎秒。並列化・プレフィックス分散で拡張。大容量は<b class=\"key\">マルチパートアップロード</b>、遠隔はTransfer Acceleration、範囲指定GETでの並列取得</li>\n<li>EFS：汎用/最大I/O、スループットモード（Elastic推奨）。HPC/ML共有はFSx for Lustre（S3連携）</li>\n</ul>\n<h4>スケーリング</h4>\n<ul>\n<li>ASG：<b class=\"key\">ターゲット追跡</b>（既定の第一選択。例：CPU 50%）/ ステップ / スケジュール（予測可能な波）/ 予測スケーリング（周期的負荷を事前に増強）/ ウォームプール（起動の遅いアプリの事前初期化）</li>\n<li>キュー処理：SQSの「<b class=\"key\">インスタンスあたりのメッセージ数</b>」カスタムメトリクスで追跡</li>\n<li>Lambda：プロビジョニング済み同時実行でコールドスタート抑制、予約同時実行で上限/確保。SnapStart（Java等）</li>\n<li>DynamoDB：オンデマンド（予測不能）/ プロビジョニング + Auto Scaling。<span class=\"trap\">ホットパーティション</span>はキー設計で解消（書込みシャーディング）</li>\n<li><b class=\"key\">EC2配置グループ</b>：クラスター（低レイテンシ・高帯域）/ パーティション / スプレッド（障害分離）</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-5-p4-a",
+      "ox-3-5-p4-b",
+      "ox-3-5-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3-6",
+   "title": "セキュリティ改善（GuardDuty / Inspector / Access Analyzer）",
+   "pages": [
+    {
+     "id": "3-6-p1",
+     "title": "セキュリティサービスの使い分け",
+     "html": "\n<table>\n<tr><th>サービス</th><th>何を見るか</th></tr>\n<tr><td><b class=\"key\">GuardDuty</b></td><td>CloudTrail/VPCフロー/DNSログ/S3/EKS/Lambda等を分析する脅威検出（侵害されたEC2、不審なAPI、暗号通貨マイニング）。エージェント不要</td></tr>\n<tr><td>Inspector</td><td>EC2・ECRコンテナイメージ・Lambdaの<b class=\"key\">ソフトウェア脆弱性（CVE）とネットワーク到達性</b>を継続スキャン。EC2はSSM Agent利用</td></tr>\n<tr><td>Macie</td><td>S3内の機密データ（PII等）の検出と、S3バケットのセキュリティ/公開状況の評価</td></tr>\n<tr><td><b class=\"key\">Security Hub</b></td><td>各サービスの検出結果を集約・正規化（ASFF）し、CIS/AWS基礎セキュリティのベストプラクティス基準でスコア化。複数アカウント/リージョン集約</td></tr>\n<tr><td>Detective</td><td>検出結果の根本原因調査（グラフ分析）</td></tr>\n<tr><td><b class=\"key\">IAM Access Analyzer</b></td><td>外部/組織外へ公開されているリソースの検出、未使用アクセス検出、ポリシー検証・生成</td></tr>\n<tr><td>Config</td><td>設定の準拠評価と変更履歴</td></tr>\n<tr><td><b class=\"key\">Trusted Advisor</b></td><td>セキュリティを含むベストプラクティスの簡易チェック（SG開放ポート、MFA未設定、公開EBSスナップショット等）</td></tr>\n<tr><td>Firewall Manager</td><td>Organizations全体でWAF/Shield/SG/Network Firewallポリシーを一元適用</td></tr>\n</table>\n<ul>\n<li>組織全体で有効化するには、GuardDuty/Security Hub/Inspector/Macie/Config/Access Analyzerなどの<b class=\"key\">委任管理者</b>を設定し、新規アカウントを自動有効化</li>\n<li><span class=\"trap\">引っ掛け</span>：「S3の機密データ」=Macie、「EC2のCVE」=Inspector、「怪しい挙動」=GuardDuty、「集約ダッシュボード」=Security Hub。名前の似た選択肢を取り違えない</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-6-p1-a",
+      "ox-3-6-p1-b",
+      "ox-3-6-p1-c"
+     ]
+    },
+    {
+     "id": "3-6-p2",
+     "title": "最小権限への改善：IAM Access Analyzer と権限管理",
+     "html": "\n<h4>IAM Access Analyzer</h4>\n<ul>\n<li><b class=\"key\">外部アクセスの検出</b>：S3、IAMロール信頼ポリシー、KMS、SQS、Lambda、Secrets Manager等が信頼ゾーン（アカウント/組織）外と共有されていないか。ゾーンは組織単位も選べる</li>\n<li>未使用アクセスの検出：未使用のロール、アクセスキー、パスワード、権限を検出（有料）</li>\n<li><b class=\"key\">ポリシー生成</b>：CloudTrailのアクティビティから、実際に使われたAPIだけを許可する最小権限ポリシーを生成</li>\n<li>ポリシー検証：文法・セキュリティ警告の確認、<b class=\"key\">カスタムポリシーチェック</b>で変更差分の検査（CI/CDに組み込める）</li>\n</ul>\n<h4>権限境界のレイヤー</h4>\n<table>\n<tr><th>仕組み</th><th>役割</th></tr>\n<tr><td>SCP</td><td>組織/OUの上限を定義。<span class=\"trap\">SCP自体は権限を付与しない</span>。管理アカウントには適用されない</td></tr>\n<tr><td>アクセス許可の境界</td><td>IAMユーザー/ロールの上限。開発者に「ロール作成は可、ただし境界付き」で委任</td></tr>\n<tr><td><b class=\"key\">セッションポリシー</b></td><td>AssumeRole時にさらに絞る</td></tr>\n<tr><td>リソースベースポリシー</td><td>リソース側で許可。同一アカウント内ではIdentityポリシーなしでも許可になりうる</td></tr>\n</table>\n<ul>\n<li>有効な権限＝（SCP ∩ 境界 ∩ セッションポリシー ∩ Identityポリシー）、明示的Denyが最優先</li>\n<li><b class=\"key\">IAMの最終アクセス情報</b>（サービス/アクション）で未使用権限を削除</li>\n<li>人はIAM Identity Center（SSO、一時認証情報）、ワークロードはIAMロール。長期アクセスキーを避ける。MFA、パスワードポリシー、ルートの保護</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-6-p2-a",
+      "ox-3-6-p2-b",
+      "ox-3-6-p2-c"
+     ]
+    },
+    {
+     "id": "3-6-p3",
+     "title": "データ保護・ネットワーク防御の改善",
+     "html": "\n<h4>暗号化と秘密情報</h4>\n<ul>\n<li>KMS：AWS管理キーは自動ローテーション（年次）で制御不可。カスタマー管理キーは自動ローテーション有効化可（既定は年1回、期間指定も可）。キーポリシーが主役。マルチリージョンキーで複数リージョンの同一キー素材（クロスリージョンのDR/グローバルテーブル）。<b class=\"key\">外部キーストア（XKS）</b>やCloudHSMは「自社管理/専用HSM」要件</li>\n<li>Secrets Manager：RDS等の自動ローテーション、クロスリージョンレプリケーション。ACM：証明書の自動更新（ELB/CloudFront/API Gatewayに統合。EC2に直接エクスポートはPrivate証明書など限定）</li>\n<li>S3：ブロックパブリックアクセス（アカウント/バケット）、バケットポリシーでaws:SecureTransportによりHTTPS強制、SSE-KMS、オブジェクトロック（WORM）、<b class=\"key\">アクセスポイント</b>で用途別アクセス</li>\n</ul>\n<h4>ネットワークと入口</h4>\n<ul>\n<li>セキュリティグループ：ステートフル、許可のみ。NACL：ステートレス、許可/拒否、サブネット単位（特定IPのブロックはNACL）</li>\n<li><b class=\"key\">AWS WAF</b>：ALB/API Gateway/CloudFront/AppSyncのL7保護（SQLi/XSS、レートベースルール、Bot Control）。Shield Advanced：DDoS保護、DRT支援、コスト保護</li>\n<li>Network Firewall：VPC境界の詳細検査（ドメインフィルタ、IPS）。VPCエンドポイントとエンドポイントポリシーで、データをインターネットに出さずAWSサービスへ</li>\n<li>CloudFrontの<b class=\"key\">OAC（Origin Access Control）</b>で、S3オリジンへ直接アクセスさせずCloudFront経由のみに</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-6-p3-a",
+      "ox-3-6-p3-b",
+      "ox-3-6-p3-c"
+     ]
+    },
+    {
+     "id": "3-6-p4",
+     "title": "インシデント対応と継続的な改善",
+     "html": "\n<h4>自動対応の流れ</h4>\n<ul>\n<li><b class=\"key\">検知</b>：GuardDuty / Security Hub / Config / Macie</li>\n<li>ルーティング：EventBridgeでフィルタ → Lambda / SSM Automation / Step Functions</li>\n<li><b class=\"key\">封じ込め</b>：SGを隔離用に差し替え、ロールのセッション失効（AWSRevokeOlderSessions）やアクセスキー無効化、NACLでIPブロック</li>\n<li>証拠保全：EBSスナップショット、メモリ取得、インスタンスは終了せず隔離、CloudTrailログ（整合性検証）保全。<span class=\"trap\">侵害インスタンスを即終了すると証拠が失われる</span></li>\n<li><b class=\"key\">調査</b>：Detective、CloudTrail Lake、Athena</li>\n<li>復旧と学習：クリーンなAMIで再構築、根本原因の改善、ランブック更新</li>\n</ul>\n<h4>継続的改善の基盤</h4>\n<ul>\n<li>ログを<b class=\"key\">専用のログアーカイブアカウント</b>へ集約（S3 + オブジェクトロック + MFA削除/KMS）。書込み専用で改ざんを防止</li>\n<li>Security Hubの基準スコアとTrusted Advisorの推奨を定期レビューし、StackSets/Config適合パックで標準化</li>\n<li><b class=\"key\">Systems Manager Patch Manager</b>とInspectorで脆弱性管理を自動化</li>\n<li>Verified Access / Verified Permissions、Cognito等は用途（ゼロトラストアクセス/認可）が出題されたときに識別</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-6-p4-a",
+      "ox-3-6-p4-b"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3-7",
+   "title": "コスト最適化（Savings Plans / Spot / S3 / Cost Explorer）",
+   "pages": [
+    {
+     "id": "3-7-p1",
+     "title": "購入オプション：RI・Savings Plans・Spot",
+     "html": "\n<table>\n<tr><th>オプション</th><th>特徴・判断</th></tr>\n<tr><td>オンデマンド</td><td>前払い・コミットなし。短期・予測不能・初期検証</td></tr>\n<tr><td>Compute Savings Plans</td><td>最大約66%割引。1〜3年の時間あたり金額コミット。<b class=\"key\">EC2（ファミリー/サイズ/リージョン/OS/テナンシー不問）、Fargate、Lambda</b>に適用。柔軟性が最高</td></tr>\n<tr><td>EC2 Instance Savings Plans</td><td>特定リージョン・インスタンスファミリーに限定。割引率は高め（最大約72%）</td></tr>\n<tr><td>Standard RI</td><td>最大約72%。ファミリー等固定。<b class=\"key\">Convertible RI</b>は交換可能（割引率は低め、最大約66%）。RI Marketplaceで売却できるのはStandardのみ</td></tr>\n<tr><td>Spot</td><td>最大90%割引。<b class=\"key\">2分前通知</b>で中断されうる。バッチ、CI、ビッグデータ、ステートレスWeb。Spot Fleet/EC2 Fleet/ASG混合インスタンスポリシーで多様化、price-capacity-optimized配分戦略</td></tr>\n<tr><td>Dedicated Hosts</td><td>ソケット/コア単位ライセンスのBYOL、コンプライアンス</td></tr>\n</table>\n<ul>\n<li><b class=\"key\">ゾーン指定RI</b>はキャパシティ予約を伴う。リージョンRIは予約なし（AZ柔軟・サイズ柔軟性あり）。キャパシティが必要ならオンデマンドキャパシティ予約を併用</li>\n<li>RIはRDS、ElastiCache、OpenSearch、Redshiftにもある。SPはSageMakerにも</li>\n<li>基本はベースラインにSP/RI、ピークはオンデマンド/Spotの組み合わせ</li>\n<li><span class=\"trap\">引っ掛け</span>：「将来インスタンスファミリーやリージョンを変える/Fargate・Lambdaも使う」→ Compute Savings Plans。「コミットできない・中断可・耐障害」→ Spot。<b class=\"key\">RIのほうがSPより安い</b>とは限らず、同等割引ならSPの柔軟性が勝つ</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-7-p1-a",
+      "ox-3-7-p1-b",
+      "ox-3-7-p1-c"
+     ]
+    },
+    {
+     "id": "3-7-p2",
+     "title": "コストの可視化・ガバナンス",
+     "html": "\n<table>\n<tr><th>ツール</th><th>用途</th></tr>\n<tr><td><b class=\"key\">Cost Explorer</b></td><td>過去のコスト分析、予測（最大12か月）、RI/SPの購入推奨・カバレッジ/使用率レポート</td></tr>\n<tr><td><b class=\"key\">AWS Budgets</b></td><td>予算超過の通知（実績/予測）。予算アクションでIAM/SCP適用やインスタンス停止を自動実行。RI/SPカバレッジ予算も</td></tr>\n<tr><td>Cost and Usage Report（CUR）</td><td>最も詳細な請求データをS3へ → Athena/QuickSight。Data Exports</td></tr>\n<tr><td><b class=\"key\">Cost Anomaly Detection</b></td><td>ML による異常なコスト急増の検知と通知</td></tr>\n<tr><td>コスト配分タグ</td><td>ユーザー定義タグを<b class=\"key\">有効化（アクティブ化）して初めて</b>請求に反映。<span class=\"trap\">有効化前の期間には遡及しない</span>。タグ付けの強制はタグポリシー/SCP/Configルール</td></tr>\n<tr><td>Compute Optimizer</td><td>EC2/ASG/EBS/Lambda/ECS on Fargate等の適正サイズ推奨（CloudWatchメトリクスに基づく。メモリを見るにはCloudWatch Agent）</td></tr>\n<tr><td>Trusted Advisor</td><td>低使用率EC2、アイドルELB、未使用EBS/EIP等のコスト最適化チェック</td></tr>\n<tr><td><b class=\"key\">Organizations 一括請求</b></td><td>ボリューム割引、RI/SPの割引共有をアカウント間で</td></tr>\n</table>\n<ul>\n<li>Cost Categoriesでコストをチーム/環境に分類、Billing and Cost Managementホーム</li>\n<li>FinOps的に、アカウント構造やタグでショーバック/チャージバックを実現</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-7-p2-a",
+      "ox-3-7-p2-b",
+      "ox-3-7-p2-c"
+     ]
+    },
+    {
+     "id": "3-7-p3",
+     "title": "ストレージとデータ転送のコスト最適化",
+     "html": "\n<h4>S3ストレージクラス</h4>\n<table>\n<tr><th>クラス</th><th>ポイント</th></tr>\n<tr><td>Standard</td><td>頻繁アクセス</td></tr>\n<tr><td><b class=\"key\">Intelligent-Tiering</b></td><td>アクセスパターン不明・変動。自動で階層移動、取り出し料金なし、小額の監視料金（128KB未満は対象外）</td></tr>\n<tr><td>Standard-IA / One Zone-IA</td><td>低頻度。最低30日課金、取り出し料金あり。OneZoneは単一AZなので再作成可能なデータ</td></tr>\n<tr><td><b class=\"key\">Glacier Instant Retrieval</b></td><td>四半期に1回程度、ミリ秒取り出し。最低90日</td></tr>\n<tr><td>Glacier Flexible Retrieval</td><td>分〜時間で取り出し。最低90日</td></tr>\n<tr><td>Glacier Deep Archive</td><td>最安、12〜48時間。最低180日</td></tr>\n</table>\n<ul>\n<li><b class=\"key\">ライフサイクルルール</b>で遷移/期限削除、<span class=\"trap\">不完全なマルチパートアップロードの削除</span>・古いバージョンの失効も設定してコスト削減</li>\n<li>S3 Storage Lensで組織全体の利用状況・コスト効率を分析。Storage Class AnalysisはStandard→Standard-IAの判断材料</li>\n<li>EBS：<b class=\"key\">gp2→gp3</b>、未接続ボリューム/古いスナップショット削除（EBS Snapshots Archive）、Data Lifecycle Managerで自動管理。EFS：IA / Archiveライフサイクル</li>\n</ul>\n<h4>データ転送</h4>\n<ul>\n<li><b class=\"key\">VPCゲートウェイエンドポイント（S3/DynamoDB）</b>は無料。NATゲートウェイのデータ処理料金を回避</li>\n<li>NATゲートウェイはAZごと・時間料金＋処理料金。AZ間通信にも料金。可能な限りAZ内に閉じる</li>\n<li>CloudFront経由のオリジン転送は直接インターネット送信より安価な場合が多く、キャッシュでオリジン負荷も削減</li>\n<li>大量データの初期移行は<b class=\"key\">Snowファミリー</b>/DataSync/Direct Connect（回線の継続転送が多いならDXが安い）</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-7-p3-a",
+      "ox-3-7-p3-b",
+      "ox-3-7-p3-c"
+     ]
+    },
+    {
+     "id": "3-7-p4",
+     "title": "コンピュート・DB・開発環境の最適化",
+     "html": "\n<ul>\n<li><b class=\"key\">ライトサイジング</b>：Compute Optimizer推奨を基に、過剰なインスタンスを縮小。Graviton（Arm）で価格性能比向上（互換性確認要。Lambda、RDS、ElastiCache等も対応）</li>\n<li>Lambda：メモリ=CPU比例。<b class=\"key\">AWS Lambda Power Tuning</b>で最適メモリを探索。常時高負荷ならコンテナ/EC2のほうが安い場合も</li>\n<li>Fargate Spot（中断許容）、ECS/EKSは<b class=\"key\">Karpenter</b>/Cluster Autoscalerでノード統合</li>\n<li>Aurora Serverless v2：変動負荷のDBを細かくスケール。DynamoDBオンデマンド（予測不能）と<b class=\"key\">プロビジョニング+Auto Scaling+Reserved capacity</b>（安定）の選択</li>\n<li>Redshift：RA3（コンピュートとストレージの分離）、Serverless、一時停止（pause）、Spectrumでコールドデータ</li>\n<li><b class=\"key\">開発/検証環境の夜間停止</b>：Instance Scheduler on AWSやEventBridge Scheduler + SSM Automation。本番相当を24時間稼働させない</li>\n<li>Savings Plans/RIは<span class=\"trap\">停止してもコミット分は課金</span>されるので、安定したベースラインにのみ購入</li>\n<li>データ：古いログ/バックアップの保持期間短縮、CloudWatch Logsの保持設定、Glueジョブ、<b class=\"key\">不要なNAT/ELB/EIP</b>（未使用のElastic IPは課金対象）の削除</li>\n</ul>\n<h4>試験での判断</h4>\n<ul>\n<li>「運用変更を最小・割引を確実」→ Savings Plans / RI</li>\n<li>「中断可・最大削減」→ Spot</li>\n<li>「予測不能なアクセス」→ Intelligent-Tiering / オンデマンド系</li>\n<li>「コスト最小」だけで信頼性要件（可用性）を壊す選択肢は誤り</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-7-p4-a",
+      "ox-3-7-p4-b"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3-8",
+   "title": "トラブルシューティング（ネットワーク・アプリ・データ・権限）",
+   "pages": [
+    {
+     "id": "3-8-p1",
+     "title": "ネットワーク接続のトラブルシューティング",
+     "html": "\n<h4>「つながらない」の切り分け順序</h4>\n<ol>\n<li><b class=\"key\">ルートテーブル</b>（宛先へのルート、IGW/NAT/TGW/ピアリング）</li>\n<li>セキュリティグループ（ステートフル：戻りは自動許可）</li>\n<li><b class=\"key\">NACL</b>（ステートレス：エフェメラルポート 1024-65535の戻り許可が必要）</li>\n<li>OS内FW、アプリのリッスン、DNS（Route 53 Resolver、プライベートホストゾーン、VPC DNS属性）</li>\n</ol>\n<ul>\n<li>VPC Reachability Analyzer：送信元/宛先を指定し、<b class=\"key\">パケットを送らずに</b>構成を解析して到達可否とブロック箇所を示す</li>\n<li>VPC フローログ：ACCEPT/REJECTを記録。<b class=\"key\">SG拒否とNACL拒否の切り分け</b>に（NACLは戻り通信もREJECTとして見える）。内容（ペイロード）は記録しない。Traffic Mirroringはパケット詳細</li>\n<li>Network Access Analyzer：意図しない到達経路（例：インターネットからDBへ）を検出</li>\n<li><b class=\"key\">Transit Gateway</b>：ルートテーブルの関連付け/伝播、CIDR重複、ピアリングは推移的でない</li>\n<li><b class=\"key\">VPN/Direct Connect</b>：CloudWatchトンネル状態、BGP広告、MTU、冗長化</li>\n<li>パブリックインスタンスがインターネットに出られない → パブリックIP/EIP、IGWへのルート。プライベートはNATのルートと、NATがパブリックサブネットにあるか</li>\n</ul>\n<p><span class=\"trap\">引っ掛け</span>：「SGでは許可しているのに通らない」→ NACLのDeny/エフェメラルポート。「一方向だけ通る」→ NACLのリターン許可漏れ。</p>\n",
+     "oxIds": [
+      "ox-3-8-p1-a",
+      "ox-3-8-p1-b",
+      "ox-3-8-p1-c"
+     ]
+    },
+    {
+     "id": "3-8-p2",
+     "title": "コンピュート・アプリのトラブルシューティング",
+     "html": "\n<h4>ロードバランサー</h4>\n<ul>\n<li><b class=\"key\">502 Bad Gateway</b>：ターゲットが不正な応答/接続を突然切断（アプリのkeep-alive設定がLBのアイドルタイムアウトより短い等）</li>\n<li>503 Service Unavailable：<b class=\"key\">正常なターゲットがない</b>、ターゲット未登録（ヘルスチェック失敗）</li>\n<li>504 Gateway Timeout：ターゲットがアイドルタイムアウト内に応答しない（処理が遅い、SG/NACLで到達不可）</li>\n<li>ヘルスチェック失敗：SGでLBからのヘルスチェックポートを許可、パス、応答コード（matcher）、起動猶予（ASGのヘルスチェック猶予期間）</li>\n<li>クライアントIPを保持したい：X-Forwarded-For（ALB）、NLBはクライアントIP保持（ターゲットタイプによる）</li>\n</ul>\n<h4>EC2 / ECS / Lambda</h4>\n<ul>\n<li><b class=\"key\">EC2ステータスチェック</b>：システム（ホスト側 → 復旧/停止起動）とインスタンス（OS側 → 再起動/修正）の2種類</li>\n<li>起動失敗「Client.InternalError」：KMSキー権限不足でEBS暗号化AMIが起動できない等。「InsufficientInstanceCapacity」：AZ/タイプを変える・容量予約</li>\n<li>ECSタスクが起動しない/停止：停止理由（stoppedReason）、タスク実行ロール（ECRプル・ログ出力）、メモリ不足（OOM）、ENI/サブネットIP枯渇、イメージ取得に必要なNAT/VPCエンドポイント</li>\n<li>Lambda：Throttles（同時実行上限、予約同時実行）、Timeout（最大15分）、VPC内Lambdaがインターネットに出られない（NAT必要）、非同期呼び出し失敗は<b class=\"key\">DLQ / 失敗時の宛先</b>、ストリームではバッチ失敗でシャードが詰まる→ 再試行上限/bisect/宛先設定</li>\n<li>CloudFormation失敗：イベントタブで最初のFAILEDを確認。依存関係、IAM権限、上限（クォータ）、名前の重複</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-8-p2-a",
+      "ox-3-8-p2-b",
+      "ox-3-8-p2-c"
+     ]
+    },
+    {
+     "id": "3-8-p3",
+     "title": "データ層・アクセス拒否のトラブルシューティング",
+     "html": "\n<h4>データベース</h4>\n<ul>\n<li>CPU高/遅い：<b class=\"key\">Performance Insights</b>で上位SQLと待機イベント → インデックス、クエリ改善、リードレプリカ、スケールアップ</li>\n<li>接続数上限（Too many connections）：RDS Proxy、コネクション管理、max_connections（メモリに依存）</li>\n<li><b class=\"key\">レプリカラグ</b>：CloudWatch ReplicaLag（Aurora: AuroraReplicaLag）。書込み負荷、レプリカの性能不足、長いクエリ</li>\n<li>ストレージ満杯：ストレージ自動スケーリング（RDS）。IOPS不足：gp3/io2へ変更、Provisioned IOPS</li>\n<li>DynamoDB：ProvisionedThroughputExceeded/スロットリング → ホットキー、キャパシティ、オンデマンド化、DAX、リトライ+指数バックオフ（SDKは自動）。<b class=\"key\">GSIのスロットリング</b>は基底テーブルの書込みも制限</li>\n</ul>\n<h4>アクセス拒否（AccessDenied）</h4>\n<ul>\n<li>評価：明示的Deny → SCP → 境界/セッション → 許可。クロスアカウントは<span class=\"trap\">両側</span>（Identityポリシー + リソースポリシー）で許可が必要</li>\n<li>S3 403：バケットポリシー、ブロックパブリックアクセス、<b class=\"key\">KMSキーポリシー（SSE-KMSのオブジェクトはkms:Decryptも必要）</b>、オブジェクト所有権（ACL）、VPCエンドポイントポリシー</li>\n<li>調査：CloudTrailのerrorCode、IAM Policy Simulator、Access Analyzer、<b class=\"key\">エンコードされた認可メッセージ</b>（sts:DecodeAuthorizationMessage）</li>\n<li>SQS：可視性タイムアウトより処理が長いと二重処理 → 延長/ハートビート。DLQの redrive で再処理。FIFOはグループIDで順序</li>\n<li>クォータ：Service Quotas / Trusted Advisorのサービスクォータチェック。Auto Scalingが増えない原因がEC2上限のことも</li>\n</ul>\n",
+     "oxIds": [
+      "ox-3-8-p3-a",
+      "ox-3-8-p3-b",
+      "ox-3-8-p3-c"
+     ]
+    }
+   ]
+  }
+ ],
+ "ox": [
+  {
+   "id": "ox-3-1-p1-a",
+   "lesson": "3-1",
+   "text": "EC2のメモリ使用率はCloudWatchの標準メトリクスとして自動収集される。",
+   "answer": false,
+   "explain": "メモリ・ディスク使用率は標準メトリクスに含まれない。CloudWatch Agentで収集する。"
+  },
+  {
+   "id": "ox-3-1-p1-b",
+   "lesson": "3-1",
+   "text": "複合アラームは複数のアラーム状態を論理式で組み合わせ、通知のノイズを減らすのに使える。",
+   "answer": true,
+   "explain": "AND/OR/NOTで束ねて、真に対応が必要な状況のみ通知できる。"
+  },
+  {
+   "id": "ox-3-1-p1-c",
+   "lesson": "3-1",
+   "text": "CloudWatch Logsのロググループは既定で30日後に自動削除される。",
+   "answer": false,
+   "explain": "既定は無期限保持。保持期間を明示設定しないとコストが増え続ける。"
+  },
+  {
+   "id": "ox-3-1-p2-a",
+   "lesson": "3-1",
+   "text": "X-Rayのサービスマップは、分散アプリケーションのどのサービスがレイテンシやエラーの原因かを特定するのに適している。",
+   "answer": true,
+   "explain": "トレースデータからノード間のレイテンシ・エラー率を可視化する。"
+  },
+  {
+   "id": "ox-3-1-p2-b",
+   "lesson": "3-1",
+   "text": "CloudWatch Syntheticsのカナリアは、実ユーザーのアクセスがある時のみ可用性を検知できる。",
+   "answer": false,
+   "explain": "Syntheticsはスクリプトによる合成トラフィックなので、実ユーザーがいなくても検知できる。実ユーザー計測はRUM。"
+  },
+  {
+   "id": "ox-3-1-p2-c",
+   "lesson": "3-1",
+   "text": "X-Rayのアノテーションはインデックス化され、フィルター式での検索に使える。",
+   "answer": true,
+   "explain": "アノテーションは検索可能。メタデータは検索対象にならない。"
+  },
+  {
+   "id": "ox-3-1-p3-a",
+   "lesson": "3-1",
+   "text": "CloudTrailのイベント履歴（コンソール）は管理イベントを過去90日間参照できる。",
+   "answer": true,
+   "explain": "長期保管には証跡をS3等に作成する。"
+  },
+  {
+   "id": "ox-3-1-p3-b",
+   "lesson": "3-1",
+   "text": "S3オブジェクトレベルのAPI（GetObject等）は、管理イベント用の証跡を作成するだけで自動的に記録される。",
+   "answer": false,
+   "explain": "S3オブジェクトレベルはデータイベントで、既定では無効。明示的に有効化が必要。"
+  },
+  {
+   "id": "ox-3-1-p3-c",
+   "lesson": "3-1",
+   "text": "AWS Configルールは非準拠リソースを検知でき、SSM Automationによる自動修復とも連携できる。",
+   "answer": true,
+   "explain": "修復アクション（remediation）としてSSM Automationランブックを紐付けられる。"
+  },
+  {
+   "id": "ox-3-1-p4-a",
+   "lesson": "3-1",
+   "text": "欠損データを異常（breaching）として扱う設定により、メトリクスが途絶えた場合にもアラームを発報させられる。",
+   "answer": true,
+   "explain": "TreatMissingDataをbreachingにするとデータ途絶をALARMとして扱える。"
+  },
+  {
+   "id": "ox-3-1-p4-b",
+   "lesson": "3-1",
+   "text": "「誰がセキュリティグループを変更したか」を調べるには、Configの設定タイムラインのみで十分で、CloudTrailは不要である。",
+   "answer": false,
+   "explain": "Configのタイムラインはいつどう変わったかを示すが、実行者のAPI呼び出し記録はCloudTrailで確認する。"
+  },
+  {
+   "id": "ox-3-2-p1-a",
+   "lesson": "3-2",
+   "text": "EventBridgeのルールは、イベントパターンだけでなくcron/rate式によるスケジュール起動にも使える。",
+   "answer": true,
+   "explain": "どちらも可能。大量・単発のスケジュールにはEventBridge Schedulerが適する。"
+  },
+  {
+   "id": "ox-3-2-p1-b",
+   "lesson": "3-2",
+   "text": "他アカウントのイベントバスへイベントを転送するには、送信元でIAMロールを作成するだけでよく、受信側バスのリソースポリシーは不要である。",
+   "answer": false,
+   "explain": "受信側のバスのリソースポリシーで送信元アカウントを許可する必要がある。"
+  },
+  {
+   "id": "ox-3-2-p1-c",
+   "lesson": "3-2",
+   "text": "EventBridgeのアーカイブとリプレイにより、過去のイベントを再度バスに流して再処理できる。",
+   "answer": true,
+   "explain": "アーカイブしたイベントをリプレイできる。"
+  },
+  {
+   "id": "ox-3-2-p2-a",
+   "lesson": "3-2",
+   "text": "Session Managerを使うと、セキュリティグループで22番ポートを開けなくてもEC2インスタンスにシェル接続できる。",
+   "answer": true,
+   "explain": "SSMエージェントからのアウトバウンド通信で接続するため、インバウンド開放不要。"
+  },
+  {
+   "id": "ox-3-2-p2-b",
+   "lesson": "3-2",
+   "text": "Patch Managerで管理するにはインスタンスにSSM Agentが必要だが、IAM権限は不要である。",
+   "answer": false,
+   "explain": "インスタンスプロファイル等でSSMへの権限付与が必要。"
+  },
+  {
+   "id": "ox-3-2-p2-c",
+   "lesson": "3-2",
+   "text": "Parameter Storeは、データベース認証情報の自動ローテーション機能を標準で備えている。",
+   "answer": false,
+   "explain": "自動ローテーションはSecrets Managerの機能。"
+  },
+  {
+   "id": "ox-3-2-p3-a",
+   "lesson": "3-2",
+   "text": "Auto Scalingグループは、ELBヘルスチェックを有効にしない限り、EC2のステータスチェックのみで異常を判断する。",
+   "answer": true,
+   "explain": "既定はEC2ヘルスチェック。アプリ層の異常検知にはELBヘルスチェックの有効化が必要。"
+  },
+  {
+   "id": "ox-3-2-p3-b",
+   "lesson": "3-2",
+   "text": "EC2の「復旧」アクションはインスタンスストアボリュームのデータも保持したまま復旧させる。",
+   "answer": false,
+   "explain": "復旧アクションはインスタンスストアを使うインスタンスには対応せず、EBSバックのインスタンスが対象。"
+  },
+  {
+   "id": "ox-3-2-p3-c",
+   "lesson": "3-2",
+   "text": "Configルールの修復アクションに、SSM Automationランブックを指定して非準拠リソースを自動修復できる。",
+   "answer": true,
+   "explain": "手動実行も自動実行も設定可能。"
+  },
+  {
+   "id": "ox-3-3-p1-a",
+   "lesson": "3-3",
+   "text": "CodeBuildがVPC内のプライベートなRDSに接続してテストを実行するには、CodeBuildプロジェクトにVPC設定が必要である。",
+   "answer": true,
+   "explain": "VPC設定を行うことでVPC内リソースへアクセスできる。"
+  },
+  {
+   "id": "ox-3-3-p1-b",
+   "lesson": "3-3",
+   "text": "CodePipelineでクロスアカウントデプロイを行う場合、成果物バケットの暗号化にAWS管理キーを使っても別アカウントから復号できる。",
+   "answer": false,
+   "explain": "AWS管理キーはアカウント間共有できない。カスタマー管理キーでキーポリシーに相手アカウントを許可する。"
+  },
+  {
+   "id": "ox-3-3-p1-c",
+   "lesson": "3-3",
+   "text": "CodePipelineには本番デプロイ前に人の承認を挟む手動承認アクションがある。",
+   "answer": true,
+   "explain": "SNS通知と組み合わせて利用する。"
+  },
+  {
+   "id": "ox-3-3-p2-a",
+   "lesson": "3-3",
+   "text": "CodeDeployのLambdaデプロイでは、エイリアスのトラフィックを段階的に新バージョンへ移すCanaryやLinear設定が使える。",
+   "answer": true,
+   "explain": "Canary/Linear/AllAtOnceが選べる。"
+  },
+  {
+   "id": "ox-3-3-p2-b",
+   "lesson": "3-3",
+   "text": "CodeDeployでCloudWatchアラームを自動ロールバックのトリガーに設定することはできない。",
+   "answer": false,
+   "explain": "アラーム発報時の自動ロールバックを設定できる。"
+  },
+  {
+   "id": "ox-3-3-p2-c",
+   "lesson": "3-3",
+   "text": "ECSサービスのCodeDeployデプロイは、In-placeとBlue/Greenの両方から選べる。",
+   "answer": false,
+   "explain": "ECSのCodeDeployデプロイはBlue/Greenのみ。"
+  },
+  {
+   "id": "ox-3-3-p3-a",
+   "lesson": "3-3",
+   "text": "Elastic Beanstalkのimmutableデプロイは、新しいASGで新インスタンスを起動して検証するため、失敗時のロールバックが容易である。",
+   "answer": true,
+   "explain": "失敗時は新ASGを終了するだけで元の環境が無傷で残る。"
+  },
+  {
+   "id": "ox-3-3-p3-b",
+   "lesson": "3-3",
+   "text": "Route 53の加重ルーティングによるBlue/Green切替は、DNSキャッシュの影響を受けず必ず即時に反映される。",
+   "answer": false,
+   "explain": "TTLやクライアント/リゾルバのキャッシュにより即時でない。"
+  },
+  {
+   "id": "ox-3-3-p3-c",
+   "lesson": "3-3",
+   "text": "AWS AppConfigは、アプリ設定やフィーチャーフラグをコード再デプロイなしに段階的に配信でき、アラーム連動でロールバックもできる。",
+   "answer": true,
+   "explain": "AppConfigのデプロイ戦略とCloudWatchアラーム監視による。"
+  },
+  {
+   "id": "ox-3-3-p4-a",
+   "lesson": "3-3",
+   "text": "EC2 Image Builderは、パッチ適用とテストを含むAMIのビルドを自動化し、複数リージョンへ配布できる。",
+   "answer": true,
+   "explain": "パイプラインでビルド・テスト・配布を自動化する。"
+  },
+  {
+   "id": "ox-3-3-p4-b",
+   "lesson": "3-3",
+   "text": "ECRのライフサイクルポリシーにより、古いイメージを自動で削除してストレージコストを抑えられる。",
+   "answer": true,
+   "explain": "タグ付き/タグなし、保持数や日数などのルールを設定できる。"
+  },
+  {
+   "id": "ox-3-4-p1-a",
+   "lesson": "3-4",
+   "text": "変更セットを使うと、スタック更新の実行前にリソースが置換されるかどうかを確認できる。",
+   "answer": true,
+   "explain": "変更セットは追加/変更/削除と置換の有無を事前に提示する。"
+  },
+  {
+   "id": "ox-3-4-p1-b",
+   "lesson": "3-4",
+   "text": "他のスタックからImportValueされているExport値は、そのスタックを更新して削除できる。",
+   "answer": false,
+   "explain": "参照されている間はExportの削除・変更はできない。"
+  },
+  {
+   "id": "ox-3-4-p1-c",
+   "lesson": "3-4",
+   "text": "カスタムリソースのLambdaが応答をResponseURLに返さないと、スタック操作が長時間ハングすることがある。",
+   "answer": true,
+   "explain": "成功/失敗を必ず返す。削除イベントでも返す。"
+  },
+  {
+   "id": "ox-3-4-p2-a",
+   "lesson": "3-4",
+   "text": "StackSetsのサービスマネージド権限では、OUに自動デプロイを有効にすると、後からOUに追加された新規アカウントにも自動でスタックが展開される。",
+   "answer": true,
+   "explain": "Organizations統合の自動デプロイ機能。"
+  },
+  {
+   "id": "ox-3-4-p2-b",
+   "lesson": "3-4",
+   "text": "StackSetsはOrganizations配下のアカウントにしか使えない。",
+   "answer": false,
+   "explain": "セルフマネージド権限なら、Organizations外のアカウントにも展開できる。"
+  },
+  {
+   "id": "ox-3-4-p2-c",
+   "lesson": "3-4",
+   "text": "StackSetsのオペレーション設定で、同時デプロイ数や障害許容数を指定して段階的に展開できる。",
+   "answer": true,
+   "explain": "Maximum concurrent accounts と Failure tolerance。"
+  },
+  {
+   "id": "ox-3-4-p3-a",
+   "lesson": "3-4",
+   "text": "CloudFormationのドリフト検出は、検出したドリフトを自動的にテンプレートの内容へ修復する。",
+   "answer": false,
+   "explain": "検出のみで自動修復はしない。"
+  },
+  {
+   "id": "ox-3-4-p3-b",
+   "lesson": "3-4",
+   "text": "既存リソースを後からCloudFormation管理下に置くには、リソースインポートを使う。",
+   "answer": true,
+   "explain": "インポート対象にはDeletionPolicyとリソース識別子が必要。"
+  },
+  {
+   "id": "ox-3-4-p4-a",
+   "lesson": "3-4",
+   "text": "AWS CDKで定義したインフラは、デプロイ時にCloudFormationテンプレートに変換され、CloudFormationスタックとして管理される。",
+   "answer": true,
+   "explain": "cdk synthでテンプレート生成、デプロイはCloudFormation経由。"
+  },
+  {
+   "id": "ox-3-4-p4-b",
+   "lesson": "3-4",
+   "text": "Service Catalogの起動制約を使うと、エンドユーザー本人に広い権限を付与しなくても承認済み製品を起動させられる。",
+   "answer": true,
+   "explain": "起動制約のIAMロールで製品をプロビジョニングする。"
+  },
+  {
+   "id": "ox-3-4-p4-c",
+   "lesson": "3-4",
+   "text": "CDKのL1コンストラクトは、既定値や便利メソッドが豊富に用意された高レベルの抽象化である。",
+   "answer": false,
+   "explain": "L1はCloudFormationリソースそのもの（Cfn接頭辞）。高レベルなのはL2/L3。"
+  },
+  {
+   "id": "ox-3-5-p1-a",
+   "lesson": "3-5",
+   "text": "Well-Architected Frameworkの柱は、運用上の優秀性、セキュリティ、信頼性、パフォーマンス効率、コスト最適化、持続可能性の6つである。",
+   "answer": true,
+   "explain": "持続可能性は後から追加された6番目の柱。"
+  },
+  {
+   "id": "ox-3-5-p1-b",
+   "lesson": "3-5",
+   "text": "Well-Architected Toolは、評価で見つかった高リスク項目を自動的に修正する。",
+   "answer": false,
+   "explain": "ツールは質問ベースの評価と改善計画の提示を行うのみで、自動修正はしない。"
+  },
+  {
+   "id": "ox-3-5-p1-c",
+   "lesson": "3-5",
+   "text": "Trusted Advisorの全チェックを利用するには、BusinessまたはEnterprise系のサポートプランが必要である。",
+   "answer": true,
+   "explain": "Basic/Developerでは一部のコアチェックに限られる。"
+  },
+  {
+   "id": "ox-3-5-p2-a",
+   "lesson": "3-5",
+   "text": "RDS Multi-AZ配置（標準のインスタンス構成）のスタンバイインスタンスは、読み取りトラフィックの負荷分散に利用できる。",
+   "answer": false,
+   "explain": "標準のMulti-AZのスタンバイは読み取り不可。読み取りスケールにはリードレプリカ（またはMulti-AZ DBクラスター構成の読み取り可能スタンバイ）を使う。"
+  },
+  {
+   "id": "ox-3-5-p2-b",
+   "lesson": "3-5",
+   "text": "パイロットライト方式は、縮小版のフル環境を常時稼働させておく方式であり、ウォームスタンバイよりコストが高い。",
+   "answer": false,
+   "explain": "パイロットライトはコアのみ稼働で、ウォームスタンバイより低コスト。縮小版のフル環境稼働はウォームスタンバイ。"
+  },
+  {
+   "id": "ox-3-5-p2-c",
+   "lesson": "3-5",
+   "text": "Global Acceleratorは、DNSキャッシュに依存せずエンドポイントのヘルスに基づいてトラフィックを素早く切り替えられる。",
+   "answer": true,
+   "explain": "エニーキャストIPを使うためDNSのTTLに左右されない。"
+  },
+  {
+   "id": "ox-3-5-p3-a",
+   "lesson": "3-5",
+   "text": "RDS Performance Insightsは、データベース負荷の原因となっているSQLや待機イベントを特定するのに役立つ。",
+   "answer": true,
+   "explain": "DBロードを待機イベント/SQL/ホスト別に分析できる。"
+  },
+  {
+   "id": "ox-3-5-p3-b",
+   "lesson": "3-5",
+   "text": "リードレプリカを追加すれば、データベースの書き込みスループットも向上する。",
+   "answer": false,
+   "explain": "レプリカは読み取り専用でスケールする。書き込みはプライマリに集中する。"
+  },
+  {
+   "id": "ox-3-5-p3-c",
+   "lesson": "3-5",
+   "text": "Lambdaから大量にRDSへ接続して接続数が枯渇する問題には、RDS Proxyによる接続プーリングが有効である。",
+   "answer": true,
+   "explain": "接続を多重化して再利用する。"
+  },
+  {
+   "id": "ox-3-5-p4-a",
+   "lesson": "3-5",
+   "text": "EBSのgp3ボリュームは、容量とは独立にIOPSとスループットを指定できる。",
+   "answer": true,
+   "explain": "gp2はIOPSが容量に比例するが、gp3は独立設定でき単価も安い。"
+  },
+  {
+   "id": "ox-3-5-p4-b",
+   "lesson": "3-5",
+   "text": "DynamoDBのホットパーティション問題は、プロビジョニング済みキャパシティを増やすだけで常に解決する。",
+   "answer": false,
+   "explain": "特定キーへのアクセス集中が原因なので、キー設計（分散）で解決する必要がある。"
+  },
+  {
+   "id": "ox-3-5-p4-c",
+   "lesson": "3-5",
+   "text": "Auto Scalingの予測スケーリングは、周期的な負荷パターンに対して事前にキャパシティを増強できる。",
+   "answer": true,
+   "explain": "過去の負荷から予測して先行スケールする。"
+  },
+  {
+   "id": "ox-3-6-p1-a",
+   "lesson": "3-6",
+   "text": "Amazon Macieは、S3バケット内のPIIなどの機密データを検出できる。",
+   "answer": true,
+   "explain": "MacieはS3のデータ分類・機密データ検出サービス。"
+  },
+  {
+   "id": "ox-3-6-p1-b",
+   "lesson": "3-6",
+   "text": "Inspectorは、VPCフローログやCloudTrailを分析して侵害されたインスタンスなどの脅威を検出する。",
+   "answer": false,
+   "explain": "それはGuardDutyの役割。InspectorはCVEなどの脆弱性スキャン。"
+  },
+  {
+   "id": "ox-3-6-p1-c",
+   "lesson": "3-6",
+   "text": "Security Hubは、複数のセキュリティサービスの検出結果を集約し、セキュリティ基準に照らして評価できる。",
+   "answer": true,
+   "explain": "ASFFで集約し、基準（例：AWS基礎セキュリティのベストプラクティス）でチェックする。"
+  },
+  {
+   "id": "ox-3-6-p2-a",
+   "lesson": "3-6",
+   "text": "IAM Access Analyzerは、CloudTrailのアクティビティに基づいて実際に使用されたアクションのみを許可するポリシーを生成できる。",
+   "answer": true,
+   "explain": "ポリシー生成機能。"
+  },
+  {
+   "id": "ox-3-6-p2-b",
+   "lesson": "3-6",
+   "text": "SCPをOUにアタッチすると、そのOU配下のアカウントのIAMユーザーに自動的にそのSCPで許可した権限が付与される。",
+   "answer": false,
+   "explain": "SCPは上限を定めるのみで、権限を付与しない。IAMポリシー等での許可も必要。"
+  },
+  {
+   "id": "ox-3-6-p2-c",
+   "lesson": "3-6",
+   "text": "Organizationsの管理アカウントにはSCPが適用されない。",
+   "answer": true,
+   "explain": "管理アカウントはSCPの対象外。そのため管理アカウントでワークロードを動かさない。"
+  },
+  {
+   "id": "ox-3-6-p3-a",
+   "lesson": "3-6",
+   "text": "NACLはステートレスであり、特定のIPアドレスからの通信を明示的に拒否（Deny）できる。",
+   "answer": true,
+   "explain": "SGは許可ルールのみ。拒否にはNACLやWAFを使う。"
+  },
+  {
+   "id": "ox-3-6-p3-b",
+   "lesson": "3-6",
+   "text": "AWS管理キーの自動ローテーションは、利用者が有効/無効を切り替えられる。",
+   "answer": false,
+   "explain": "AWS管理キーのローテーションはAWSが管理し、利用者は制御できない。カスタマー管理キーは設定可能。"
+  },
+  {
+   "id": "ox-3-6-p3-c",
+   "lesson": "3-6",
+   "text": "S3バケットポリシーでaws:SecureTransportの条件を使うと、HTTPSでないリクエストを拒否できる。",
+   "answer": true,
+   "explain": "Denyステートメントと条件キーの組み合わせで強制する。"
+  },
+  {
+   "id": "ox-3-6-p4-a",
+   "lesson": "3-6",
+   "text": "侵害が疑われるEC2インスタンスは、証拠保全のため、直ちに終了（Terminate）するのが最初の対応として適切である。",
+   "answer": false,
+   "explain": "まず隔離（SG変更等）しスナップショット等で証拠を保全する。終了は証拠喪失につながる。"
+  },
+  {
+   "id": "ox-3-6-p4-b",
+   "lesson": "3-6",
+   "text": "GuardDutyの検出結果をEventBridgeで受け、LambdaやSSM Automationで自動的に隔離処理を実行できる。",
+   "answer": true,
+   "explain": "標準的な自動対応パターン。"
+  },
+  {
+   "id": "ox-3-7-p1-a",
+   "lesson": "3-7",
+   "text": "Compute Savings Plansは、EC2だけでなくFargateとLambdaの使用量にも適用される。",
+   "answer": true,
+   "explain": "インスタンスファミリー・リージョン不問で、Fargate/Lambdaにも適用。"
+  },
+  {
+   "id": "ox-3-7-p1-b",
+   "lesson": "3-7",
+   "text": "Spotインスタンスは中断されることがないため、状態を持つ単一インスタンスのDBにも適している。",
+   "answer": false,
+   "explain": "Spotは2分前通知で中断されうる。ステートレス・耐障害なワークロード向け。"
+  },
+  {
+   "id": "ox-3-7-p1-c",
+   "lesson": "3-7",
+   "text": "Convertible RIは別のインスタンスファミリーのRIに交換できる。",
+   "answer": true,
+   "explain": "割引率はStandardより低いが柔軟性がある。"
+  },
+  {
+   "id": "ox-3-7-p2-a",
+   "lesson": "3-7",
+   "text": "ユーザー定義のコスト配分タグは、有効化した時点以降のコストにのみ反映され、過去分には遡及しない。",
+   "answer": true,
+   "explain": "有効化してから反映される。"
+  },
+  {
+   "id": "ox-3-7-p2-b",
+   "lesson": "3-7",
+   "text": "AWS Budgetsは通知のみ可能で、予算超過時に自動でリソースへ制限を適用することはできない。",
+   "answer": false,
+   "explain": "予算アクションにより、IAMポリシー/SCPの適用やEC2/RDSの停止を自動実行できる。"
+  },
+  {
+   "id": "ox-3-7-p2-c",
+   "lesson": "3-7",
+   "text": "Compute Optimizerは、メトリクスに基づいてEC2インスタンスの適正サイズを推奨する。",
+   "answer": true,
+   "explain": "メモリ使用率を考慮するにはCloudWatch Agentが必要。"
+  },
+  {
+   "id": "ox-3-7-p3-a",
+   "lesson": "3-7",
+   "text": "アクセスパターンが予測できないS3データには、Intelligent-Tieringが適している。",
+   "answer": true,
+   "explain": "自動で階層を移動し、取り出し料金がかからない。"
+  },
+  {
+   "id": "ox-3-7-p3-b",
+   "lesson": "3-7",
+   "text": "S3 Standard-IAは、取り出し料金がなく、最低保存期間もない。",
+   "answer": false,
+   "explain": "取り出し料金があり、最低30日の課金がある。"
+  },
+  {
+   "id": "ox-3-7-p3-c",
+   "lesson": "3-7",
+   "text": "S3およびDynamoDBへのゲートウェイVPCエンドポイントを使うと、NATゲートウェイ経由のデータ処理料金を削減できる。",
+   "answer": true,
+   "explain": "ゲートウェイエンドポイントは追加料金なし。"
+  },
+  {
+   "id": "ox-3-7-p4-a",
+   "lesson": "3-7",
+   "text": "Savings PlansやRIは、対象インスタンスを停止している時間はコミット分の課金が発生しない。",
+   "answer": false,
+   "explain": "コミットは使用の有無に関わらず課金される。"
+  },
+  {
+   "id": "ox-3-7-p4-b",
+   "lesson": "3-7",
+   "text": "開発環境を夜間・週末に自動停止する運用は、コスト削減に有効である。",
+   "answer": true,
+   "explain": "Instance SchedulerやEventBridge Schedulerで実現できる。"
+  },
+  {
+   "id": "ox-3-8-p1-a",
+   "lesson": "3-8",
+   "text": "VPC Reachability Analyzerは、実際にパケットを送信せずにネットワーク構成を解析し、到達性やブロック箇所を特定する。",
+   "answer": true,
+   "explain": "構成ベースの静的解析。"
+  },
+  {
+   "id": "ox-3-8-p1-b",
+   "lesson": "3-8",
+   "text": "NACLはステートフルなので、インバウンドを許可すれば戻りの通信用にエフェメラルポートのアウトバウンド許可は不要である。",
+   "answer": false,
+   "explain": "NACLはステートレスなので、戻り通信の許可ルールが必要。"
+  },
+  {
+   "id": "ox-3-8-p1-c",
+   "lesson": "3-8",
+   "text": "VPCフローログはパケットのペイロード内容も記録する。",
+   "answer": false,
+   "explain": "記録されるのはメタデータ（IP、ポート、プロトコル、ACCEPT/REJECT等）のみ。"
+  },
+  {
+   "id": "ox-3-8-p2-a",
+   "lesson": "3-8",
+   "text": "ALBが503を返す一般的な原因は、登録された正常なターゲットが存在しないことである。",
+   "answer": true,
+   "explain": "ターゲット不在/全て異常。"
+  },
+  {
+   "id": "ox-3-8-p2-b",
+   "lesson": "3-8",
+   "text": "ALBが504を返すのは、ターゲットがアイドルタイムアウト内に応答を返さない場合である。",
+   "answer": true,
+   "explain": "アプリの処理遅延や到達不可が原因になる。"
+  },
+  {
+   "id": "ox-3-8-p2-c",
+   "lesson": "3-8",
+   "text": "VPC内に配置したLambda関数は、IGWへのルートのあるパブリックサブネットに置けば、パブリックIPなしでもインターネットに出られる。",
+   "answer": false,
+   "explain": "Lambda ENIにはパブリックIPが付かない。プライベートサブネット + NATゲートウェイが必要。"
+  },
+  {
+   "id": "ox-3-8-p3-a",
+   "lesson": "3-8",
+   "text": "SSE-KMSで暗号化されたS3オブジェクトを別アカウントから読むには、S3のポリシーに加えてKMSキーの使用許可（kms:Decrypt等）も必要である。",
+   "answer": true,
+   "explain": "S3とKMSの両方の許可が必要。"
+  },
+  {
+   "id": "ox-3-8-p3-b",
+   "lesson": "3-8",
+   "text": "DynamoDBのスロットリングは、パーティション内で特定のキーに偶発的に負荷が集中しても、テーブル全体のキャパシティが十分であれば発生しない。",
+   "answer": false,
+   "explain": "ホットパーティション/ホットキーでは、全体に余裕があっても個別にスロットリングされうる。"
+  },
+  {
+   "id": "ox-3-8-p3-c",
+   "lesson": "3-8",
+   "text": "CloudTrailのイベントのerrorCode（AccessDeniedなど）を確認することで、拒否されたAPI呼び出しの調査ができる。",
+   "answer": true,
+   "explain": "誰がどの操作で拒否されたかを追跡できる。"
+  }
+ ],
+ "mc": [
+  {
+   "id": "mc-3-001",
+   "stem": "ある企業は、Amazon EC2上でJavaアプリケーションを稼働させる200台のインスタンスをAuto Scalingグループで運用しています。運用チームは、メモリ使用率が85%を超えた場合に通知を受け取りたいと考えていますが、現在のCloudWatchダッシュボードにはメモリ使用率が表示されていません。新しいインスタンスにも自動的に同じ設定が適用され、運用オーバーヘッドを最小限にする必要があります。\nどのソリューションが要件を満たしますか。",
+   "items": [],
+   "choices": [
+    "CloudWatchエージェントを起動テンプレートのユーザーデータまたはSystems Manager State Managerで導入し、収集したメモリのカスタムメトリクスにアラームを設定してSNSで通知する。",
+    "インスタンスの詳細モニタリングを有効にし、標準のMemoryUtilizationメトリクスに対するCloudWatchアラームを作成する。",
+    "AWS Configルールでメモリ使用率を評価し、非準拠時にSNS通知する。",
+    "各インスタンスにSSHで接続し、cronでメモリ使用率を取得してPutMetricDataを呼び出すスクリプトを手動で設定する。"
+   ],
+   "explain": [
+    "正解。CloudWatchエージェントでメモリをカスタムメトリクスとして収集し、State Managerで継続的に適用・アラーム化できる。",
+    "詳細モニタリングは間隔を1分にするだけで、メモリは標準メトリクスに存在しない。",
+    "Configは設定の準拠評価サービスで、メモリ使用率のような実行時メトリクスの監視には使わない。",
+    "手動設定はスケールせず、新規インスタンスへの自動適用もできないため運用負荷が高い。"
+   ],
+   "tip": "EC2のメモリ・ディスクは標準メトリクスに無い。OS内部の値は「CloudWatchエージェント」と覚える。",
+   "domain": 3,
+   "answer": 1
+  },
+  {
+   "id": "mc-3-002",
+   "stem": "ある企業はマイクロサービスをAWS Lambda、Amazon ECS、Amazon DynamoDBで構築しています。最近、特定のAPIで間欠的に遅延が発生していますが、どのサービス呼び出しがボトルネックか不明です。また、アプリケーションログにERRORが1分間に10件以上出力された場合に運用チームへ通知したいと考えています。\n最小限の開発工数で両方の要件を満たすために実施すべき対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "AWS X-Rayを有効化（LambdaはアクティブトレースとECSはX-Rayデーモン/ADOT）し、サービスマップとトレースでボトルネックを特定する。",
+    "CloudWatch Logsのメトリクスフィルターで「ERROR」を数え、そのメトリクスに対するCloudWatchアラームでSNS通知する。",
+    "VPCフローログをAthenaで集計してアプリケーションエラーを検出する。",
+    "AWS Configのタイムラインでエラー件数を確認する。",
+    "AWS CloudTrailのイベント履歴からAPIレイテンシを分析する。"
+   ],
+   "explain": [
+    "正解。X-Rayはサービス間のレイテンシとエラーを可視化するための分散トレーシングサービス。",
+    "正解。メトリクスフィルターでログをメトリクス化し、アラームに接続できる。",
+    "フローログはネットワークのメタデータで、アプリケーションエラーの内容は含まれない。",
+    "Configはリソース設定の履歴であり、アプリログの件数は扱わない。",
+    "CloudTrailはAPIの監査ログであり、アプリケーションの処理遅延分析には向かない。"
+   ],
+   "tip": "「どこが遅い」＝X-Ray、「ログの文字列で通知」＝メトリクスフィルター+アラーム。",
+   "domain": 3,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-003",
+   "stem": "ある金融企業は、AWS Organizationsで400のアカウントを運用しています。コンプライアンス要件として、すべてのアカウントでS3オブジェクトレベルのアクセスを含むAPIアクティビティを7年間保管し、監査人がSQLで直接クエリできるようにする必要があります。アカウントの追加時にも自動で対象となり、監査ログは各アカウントの管理者が削除できないことが求められます。\n最も運用効率の良いソリューションはどれですか。",
+   "items": [],
+   "choices": [
+    "各アカウントでCloudTrail証跡を作成し、アカウント管理者がS3バケットを管理する。",
+    "各アカウントのCloudTrailイベント履歴（90日）を毎週エクスポートする。",
+    "管理アカウントまたは委任管理者から組織の証跡を作成し、必要なS3データイベントを有効化して、ログアーカイブアカウントのS3バケット（オブジェクトロック）へ保存する。さらにCloudTrail Lakeの組織イベントデータストアでSQLクエリを提供する。",
+    "CloudWatch Logsに各アカウントのCloudTrailを送信し、保持期間を7年に設定する。"
+   ],
+   "explain": [
+    "各アカウント管理者が削除できる構成になり、新規アカウントの自動適用もない。",
+    "イベント履歴は90日で、手動運用はスケールせず、データイベントも含まれない。",
+    "正解。組織の証跡は新規アカウントにも自動適用され、メンバーアカウントは変更できない。Lakeでマネージドなクエリも可能。",
+    "各アカウントの個別設定が必要で、コストも高く、アカウント管理者による変更も防げない。"
+   ],
+   "tip": "「全アカウント・自動適用・削除不可」＝組織の証跡。「SQLで直接」＝CloudTrail Lake。",
+   "domain": 3,
+   "answer": 3
+  },
+  {
+   "id": "mc-3-004",
+   "stem": "ある企業は、AWS Organizations配下の多数のアカウントで、暗号化されていないAmazon EBSボリュームが作成されていないかを継続的に評価し、非準拠のものを自動で是正したいと考えています（新規アカウントも自動対象）。可能な限り既存のAWSマネージド機能を使い、カスタムコードは避けたいと考えています。\nどの構成が最適ですか。",
+   "items": [],
+   "choices": [
+    "AWS Configの適合パックを組織全体にデプロイし、encrypted-volumesルールに自動修復アクション（SSM Automationランブック）を関連付ける。Configアグリゲーターで結果を集約する。",
+    "Amazon Inspectorで暗号化されていないボリュームをスキャンする。",
+    "AWS Trusted Advisorのレポートを毎週確認し、手動で是正する。",
+    "各アカウントでLambda関数を作成し、毎晩EC2 APIを呼び出して暗号化状態を確認する。"
+   ],
+   "explain": [
+    "正解。Config組織適合パック+修復アクション+アグリゲーターで、新規アカウントも含めて自動評価・是正できる。",
+    "Inspectorは脆弱性・到達性のスキャンで、EBS暗号化の準拠評価はConfigの役割。",
+    "手動で継続的でもなく自動是正にもならない。",
+    "カスタムコードの開発・運用が必要で、要件の「マネージド機能のみ」に反する。"
+   ],
+   "tip": "「設定の準拠評価＋自動修復」＝Config＋SSM Automation。",
+   "domain": 3,
+   "answer": 1
+  },
+  {
+   "id": "mc-3-005",
+   "stem": "ある企業は、10個のAWSアカウントのAmazon EC2状態変化イベントを、セキュリティアカウントのAWS Lambda関数で一元処理したいと考えています。新しいアカウントが追加される可能性があり、ほぼリアルタイムで処理しつつ、運用負荷とコストを最小限にする必要があります。最も適切な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "各アカウントでLambdaを直接実行し、結果をDynamoDBグローバルテーブルに書き込む。",
+    "各アカウントのEventBridgeルールでセキュリティアカウントのデフォルトイベントバスをターゲットにし、セキュリティアカウント側のバスのリソースポリシーで送信元アカウントを許可する。セキュリティアカウントでルールを作ってLambdaを起動する。",
+    "各アカウントのCloudWatch LogsにイベントをPutし、クロスアカウントのS3レプリケーションで集約する。",
+    "セキュリティアカウントのLambdaが各アカウントのEC2を定期的にポーリングする。"
+   ],
+   "explain": [
+    "過剰で分散した構成であり、集中処理にならない。",
+    "正解。EventBridgeはクロスアカウントのバス転送に対応し、受信側のリソースポリシーが必要。",
+    "S3レプリケーションはイベント処理の仕組みではなく、リアルタイム性もない。",
+    "ポーリングは非効率で遅延があり、各アカウントへの権限も必要で運用負荷が高い。"
+   ],
+   "tip": "クロスアカウントのイベント集約＝EventBridgeのバス転送＋受信側リソースポリシー。",
+   "domain": 3,
+   "answer": 2
+  },
+  {
+   "id": "mc-3-006",
+   "stem": "ある企業は、プライベートサブネットにある500台のLinuxインスタンスを運用しています。セキュリティ要件として、SSHポートの開放、踏み台サーバー、インターネットゲートウェイへのルートは許可されません。運用チームは、OSパッチの計画的な適用と、必要に応じたインスタンスへのシェルアクセス（操作の監査付き）を実現する必要があります。\nどの組み合わせが要件を満たしますか。",
+   "items": [],
+   "choices": [
+    "Systems Managerを使用し、インスタンスプロファイルにAmazonSSMManagedInstanceCoreを付与し、ssm・ssmmessages・ec2messagesのVPCエンドポイントを作成する。Patch Managerとメンテナンスウィンドウでパッチ適用し、Session Managerでシェル接続（ログはS3/CloudWatch Logsへ）する。",
+    "EC2 Instance Connectを有効にし、セキュリティグループで22番ポートを企業のIPに限定する。",
+    "NATゲートウェイを追加してSSHをポートフォワードする。",
+    "踏み台ホストを各VPCに配置し、SSH鍵をSecrets Managerで管理する。"
+   ],
+   "explain": [
+    "正解。インバウンド不要で、VPCエンドポイント経由のため外部経路もなく、監査も可能。",
+    "22番ポートの開放が必要で、要件に反する。",
+    "NATとSSHは要件に反し、リスクも運用も増える。",
+    "踏み台はSSHポートを必要とし、要件に反する。"
+   ],
+   "tip": "SSH不要・ポート開放なし・監査＝Session Manager。プライベートならVPCエンドポイント3種。",
+   "domain": 3,
+   "answer": 1
+  },
+  {
+   "id": "mc-3-007",
+   "stem": "ある企業のWebアプリケーションは、ALBの背後のAuto Scalingグループで稼働しています。アプリケーションプロセスがハングしてHTTP 5xxを返すインスタンスがありますが、EC2ステータスチェックは正常のため、Auto Scalingがそのインスタンスを置換しません。\n最小の変更で自動的に異常インスタンスを置換するにはどうすればよいですか。",
+   "items": [],
+   "choices": [
+    "CloudWatchアラームでCPUが低いインスタンスを手動で終了する。",
+    "スケジュールされたスケーリングで1時間おきにすべてのインスタンスを入れ替える。",
+    "ALBのアイドルタイムアウトを延長する。",
+    "Auto Scalingグループのヘルスチェックタイプを「ELB」に変更し、ターゲットグループのヘルスチェックをアプリケーションの状態を確認するパスに設定する。"
+   ],
+   "explain": [
+    "手動対応であり、自動修復にならない。",
+    "過剰で可用性にも影響し、根本解決でもない。",
+    "タイムアウト延長は異常インスタンスの置換とは無関係。",
+    "正解。ELBヘルスチェックを有効にすると、ALBが異常と判断したインスタンスもASGが置換する。"
+   ],
+   "tip": "ASGの既定はEC2ヘルスチェックのみ。アプリ層の異常検知は「ELBヘルスチェックを有効化」。",
+   "domain": 3,
+   "answer": 4
+  },
+  {
+   "id": "mc-3-008",
+   "stem": "プライベートサブネットのEC2インスタンスをSession Managerで管理しようとしていますが、Systems Managerのコンソールにインスタンスが表示されません。インスタンスにはインターネットへの経路がなく、SSM Agentはインストール済みです。\n原因を解決するために必要な対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "セキュリティグループのインバウンドで22番ポートを開放する。",
+    "インスタンスにパブリックIPを割り当ててIGWにルートを追加する。",
+    "VPCにssm、ssmmessages、ec2messagesのインターフェイスVPCエンドポイントを作成し、インスタンスからHTTPS（443）で到達できるようにする。",
+    "インスタンスプロファイルにAmazonSSMManagedInstanceCoreなどSSMの権限を持つIAMロールを関連付ける。",
+    "CloudTrailの証跡を有効化する。"
+   ],
+   "explain": [
+    "Session Managerは22番を使わない。",
+    "要件上インターネット経路は使えず、SSMの前提としても不要。",
+    "正解。インターネットなしならVPCエンドポイントが必要。",
+    "正解。インスタンスにSSMへの権限が必要。",
+    "CloudTrailはSSMの接続可否と関係ない。"
+   ],
+   "tip": "「SSMに表示されない」＝IAMインスタンスプロファイル or 通信経路（NAT/VPCエンドポイント）を疑う。",
+   "domain": 3,
+   "answers": [
+    3,
+    4
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-009",
+   "stem": "ある企業は、AWS Lambda関数をAmazon API Gatewayの背後で提供しています。新バージョンのデプロイ時、まず10%のトラフィックを新バージョンに5分間流し、CloudWatchアラームがALARMにならなければ残りを切り替え、アラーム発生時は自動で元に戻したいと考えています。\n最も運用効率が良い方法はどれですか。",
+   "items": [],
+   "choices": [
+    "API Gatewayのステージを新規作成してDNSを手動で切り替える。",
+    "AWS CodeDeployでLambdaエイリアスのCanary10Percent5Minutes配備設定を使用し、アラームによる自動ロールバックを構成する。",
+    "手動でLambdaのコードを上書きし、問題があれば再度上書きする。",
+    "Route 53の加重ルーティングで新旧のAPI Gatewayを切り替える。"
+   ],
+   "explain": [
+    "手動切替で自動化されていない。",
+    "正解。CodeDeployはLambdaのエイリアスの重みを段階的に変え、アラーム連動でロールバックする。",
+    "手動で自動ロールバックもなく、リスクが高い。",
+    "DNSキャッシュで制御が粗く、アラーム連動の自動ロールバックもない。"
+   ],
+   "tip": "Lambdaのカナリア＋アラーム自動ロールバック＝CodeDeploy（SAMのDeploymentPreferenceでも可）。",
+   "domain": 3,
+   "answer": 2
+  },
+  {
+   "id": "mc-3-010",
+   "stem": "ある企業はAmazon ECS on Fargateで稼働する本番サービスをCodeDeployのBlue/Greenでデプロイしています。リリース後に重大な不具合が見つかった場合、できるだけ短時間で旧バージョンに戻せるようにしたいと考えています。\n最も適切な設計はどれですか。",
+   "items": [],
+   "choices": [
+    "Blue/Greenデプロイで、旧タスクセットの終了までの待機時間を設定し、問題が見つかった場合はALBのリスナーを旧ターゲットグループに戻す（または停止してロールバックする）。",
+    "ECSのローリング更新に切り替え、問題があれば古いタスク定義で更新し直す。",
+    "新しいクラスターを作成し、Route 53のTTLを24時間に設定して切り替える。",
+    "デプロイのたびにコンテナイメージのタグをlatestに上書きする。"
+   ],
+   "explain": [
+    "正解。旧環境を一定時間保持し、トラフィックを戻すだけでロールバックできる。",
+    "ローリングは再デプロイに時間がかかり、即時ロールバックには向かない。",
+    "TTLが長いと切替・戻しが遅くなる。",
+    "latestの上書きは再現性がなく、ロールバック不可能になる。"
+   ],
+   "tip": "Blue/Greenの強みは「旧環境が残っているため即時切り戻し」。",
+   "domain": 3,
+   "answer": 1
+  },
+  {
+   "id": "mc-3-011",
+   "stem": "ある企業は、CodePipelineを開発アカウントに置き、本番アカウントのCloudFormationスタックへデプロイするクロスアカウントパイプラインを構築しています。成果物はS3バケットに保存されます。\nこのパイプラインを機能させるために必要な対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "成果物バケットの暗号化にカスタマー管理KMSキーを使用し、キーポリシーとバケットポリシーで本番アカウントのロールからのアクセスを許可する。",
+    "成果物バケットをAWS管理キー（aws/s3）で暗号化する。",
+    "本番アカウントのS3バケットを公開して成果物を配布する。",
+    "本番アカウントにパイプラインが引き受けるクロスアカウントIAMロールを作成し、信頼ポリシーで開発アカウントのパイプラインのロールを許可する。",
+    "本番アカウントのルートユーザーのアクセスキーをパイプラインに保存する。"
+   ],
+   "explain": [
+    "正解。CMKとポリシーでクロスアカウントのアクセスを許可する。",
+    "AWS管理キーは別アカウントと共有できず、本番側で復号できない。",
+    "公開は不要で危険。",
+    "正解。AssumeRoleでデプロイ先を操作する標準パターン。",
+    "ルートのアクセスキーは重大なセキュリティ違反。"
+   ],
+   "tip": "クロスアカウントCodePipelineは「CMK＋バケット/キーポリシー＋AssumeRoleできるロール」の3点セット。",
+   "domain": 3,
+   "answers": [
+    1,
+    4
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-012",
+   "stem": "ある企業は、Elastic Beanstalk上のWebアプリケーション（本番100インスタンス）を更新します。要件は、更新中に処理能力を落とさず、失敗時に既存環境へ影響を与えずに簡単に元へ戻せることです。リソースの一時的な増加は許容されます。\n最も適切なデプロイポリシーはどれですか。",
+   "items": [],
+   "choices": [
+    "In-place by hand",
+    "Immutable",
+    "Rolling",
+    "All at once"
+   ],
+   "explain": [
+    "手動の更新は自動化・再現性・可用性の要件を満たさない。",
+    "正解。新しいASGで新インスタンスを起動し、成功後に切替。失敗時は新ASGを破棄するだけ。",
+    "バッチごとに容量が低下し、失敗時は一部が更新済みの状態で復旧に手間がかかる。",
+    "ダウンタイムが発生し、失敗時の影響が大きい。"
+   ],
+   "tip": "「容量維持＋簡単ロールバック」＝Immutable（またはBlue/Green）。",
+   "domain": 3,
+   "answer": 2
+  },
+  {
+   "id": "mc-3-013",
+   "stem": "CloudFormationで管理されている本番のAmazon RDSインスタンスについて、チームがテンプレートのプロパティを変更しようとしています。変更内容によっては、RDSインスタンスが置換されデータが失われるリスクがあります。\nデータ損失を防ぐために実施すべき対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "更新前に変更セットを作成し、対象リソースのReplacementが「True」でないか確認する。",
+    "スタックポリシーを削除する。",
+    "RDSリソースにDeletionPolicyとUpdateReplacePolicyをSnapshot（またはRetain）に設定する。",
+    "CloudFormationのタイムアウトを延長する。",
+    "スタックの更新を直接実行して、問題があればロールバックに任せる。"
+   ],
+   "explain": [
+    "正解。変更セットは置換の有無を事前に確認できる。",
+    "スタックポリシーを削除すると保護が弱まる。",
+    "正解。置換や削除時にスナップショット/保持しデータを守る。",
+    "タイムアウトは無関係。",
+    "ロールバックでも置換や削除でデータが消える可能性があり、事前確認が必要。"
+   ],
+   "tip": "「置換でデータ消失」＝変更セット確認＋UpdateReplacePolicy/DeletionPolicy。",
+   "domain": 3,
+   "answers": [
+    1,
+    3
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-014",
+   "stem": "ある企業はAWS Organizationsを使用して数十のアカウントを運用しています。新しいアカウントがOUに追加されたら、自動的にセキュリティ監査用のIAMロールとAWS Configの設定をデプロイしたいと考えています。事前にアカウントごとのIAMロールを手動作成する運用は避けたい要件です。\n最適なソリューションはどれですか。",
+   "items": [],
+   "choices": [
+    "セルフマネージド権限のStackSetsを使用し、各アカウントに実行ロールを事前作成する。",
+    "各アカウントでCloudFormationスタックを手動作成する。",
+    "サービスマネージド権限のStackSetsを管理（または委任管理）アカウントから作成し、対象OUに自動デプロイを有効にする。",
+    "AWS CDKのcdk deployを各アカウントで実行する。"
+   ],
+   "explain": [
+    "事前にロールの作成が必要で要件に反する。",
+    "手動で、新規アカウントの自動対応がない。",
+    "正解。Organizations統合により、ロール事前作成不要で、新規アカウントにも自動展開される。",
+    "アカウントごとの手動実行が必要。"
+   ],
+   "tip": "「新規アカウントに自動」「IAMロール事前作成なし」＝サービスマネージドStackSets＋自動デプロイ。",
+   "domain": 3,
+   "answer": 3
+  },
+  {
+   "id": "mc-3-015",
+   "stem": "ある企業は、本番アカウントで開発者が手動変更したリソースがCloudFormationテンプレートから乖離していることを懸念しています。構成を定期的に検出し、今後はそのような手動変更を防止したいと考えています。\n要件を満たす対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "S3バージョニングを有効にする。",
+    "開発者のIAM権限からリソースの直接変更権限を外し、変更はパイプラインのロール経由のみに制限する（IAM/SCP）。",
+    "CloudFormationのドリフト検出を定期的に実行する（Configのcloudformation-stack-drift-detection-checkルールなどを利用）。",
+    "ドリフト検出を有効にすれば、テンプレートに自動的に戻される。",
+    "CloudTrailのログ保持を延長する。"
+   ],
+   "explain": [
+    "バージョニングはCloudFormationの手動変更とは無関係。",
+    "正解。予防的統制として権限制限が有効。",
+    "正解。ドリフト検出は乖離の検出手段。",
+    "ドリフト検出は検出のみで自動修復しない。",
+    "記録が増えても手動変更は防げない。"
+   ],
+   "tip": "ドリフトは「検出」と「予防」を分けて考える。予防はIAM/SCPで直接変更を禁止。",
+   "domain": 3,
+   "answers": [
+    2,
+    3
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-016",
+   "stem": "CloudFormationスタックの更新が失敗し、ロールバック中に再びエラーとなってスタックがUPDATE_ROLLBACK_FAILED状態になりました。原因は、手動でリソースが削除されていたことです。\n最も適切な対応はどれですか。",
+   "items": [],
+   "choices": [
+    "スタックポリシーを変更する。",
+    "変更セットを作成して更新を再実行する。",
+    "スタックを削除して再作成する。",
+    "原因を解消した上で、ContinueUpdateRollbackを実行する（必要に応じて問題のリソースをスキップする）。"
+   ],
+   "explain": [
+    "ポリシーは無関係。",
+    "UPDATE_ROLLBACK_FAILED状態では更新できない。",
+    "本番のデータ損失の可能性があり、最初の手段としては不適切。",
+    "正解。ロールバックを再開でき、解決不能なリソースはスキップできる。"
+   ],
+   "tip": "UPDATE_ROLLBACK_FAILED＝ContinueUpdateRollback。",
+   "domain": 3,
+   "answer": 4
+  },
+  {
+   "id": "mc-3-017",
+   "stem": "ある企業は、us-east-1でAmazon Aurora MySQLを使用するeコマースアプリケーションを運用しています。新しいDR要件として、リージョン障害時にRPOは数秒、RTOは15分以内を目標とし、コストは最小限に抑えたいと考えています。\n最も適切なアーキテクチャはどれですか。",
+   "items": [],
+   "choices": [
+    "両リージョンで完全なActive/Active構成にし、すべての容量を常時フル稼働させる。",
+    "別リージョンへ毎日スナップショットをコピーし、障害時に復元する。",
+    "オンプレミスにレプリケーションしてDR環境とする。",
+    "Aurora Global Databaseでセカンダリリージョンを構成し、セカンダリに最小構成のアプリ層（ウォームスタンバイ）を用意して、障害時にセカンダリをプロモートしRoute 53でフェイルオーバーする。"
+   ],
+   "explain": [
+    "要件は満たすがコストが最大で、「最小限のコスト」に反する。",
+    "スナップショット復元ではRPOが最大1日、RTOも長く要件に合わない。",
+    "オンプレへのDRは構築・運用が複雑で、RTO15分も難しい。",
+    "正解。グローバルDBは通常1秒未満の遅延で、縮小版のアプリ層でコストを抑えつつ分単位のRTOを実現できる。"
+   ],
+   "tip": "RPO秒・RTO分・コスト意識＝Aurora Global＋ウォームスタンバイ/パイロットライト。",
+   "domain": 3,
+   "answer": 4
+  },
+  {
+   "id": "mc-3-018",
+   "stem": "ある企業のAWS Lambda関数は、RDS for MySQLデータベースへ頻繁に接続します。トラフィックのスパイク時に、データベースの接続数が上限に達してエラーが発生します。アプリケーションの変更は最小限にしたいと考えています。\nどの対応が最も効果的ですか。",
+   "items": [],
+   "choices": [
+    "RDS Proxyを作成し、Lambda関数の接続先をプロキシのエンドポイントに変更する。",
+    "Lambdaの予約同時実行をゼロにする。",
+    "RDSのインスタンスサイズを最大にしてmax_connectionsを増やす。",
+    "リードレプリカを追加してLambdaの書き込みをレプリカに向ける。"
+   ],
+   "explain": [
+    "正解。接続のプーリングと多重化により接続数の急増を吸収できる。",
+    "関数が実行されなくなる。",
+    "コストが高く、根本的な接続管理の解決にならない。",
+    "リードレプリカは読み取り専用で、書き込みはできない。"
+   ],
+   "tip": "Lambda×RDSの接続枯渇＝RDS Proxy。",
+   "domain": 3,
+   "answer": 1
+  },
+  {
+   "id": "mc-3-019",
+   "stem": "ある企業のゲームアプリケーションは、Amazon DynamoDBに対して非常に読み取りが集中します。平均レイテンシを数ミリ秒からマイクロ秒に短縮したいと考えており、アプリケーションの変更は最小限にしたいです。\n最適なソリューションはどれですか。",
+   "items": [],
+   "choices": [
+    "DynamoDBをAurora MySQLに移行する。",
+    "DynamoDB Accelerator（DAX）クラスターを作成し、DAXクライアントを使用するようにする。",
+    "DynamoDBのプロビジョニング済み読み取りキャパシティを10倍にする。",
+    "ElastiCache for Memcachedを導入し、アプリケーション側でキャッシュ管理ロジックを実装する。"
+   ],
+   "explain": [
+    "大規模な移行でありレイテンシ要件にも不要。",
+    "正解。DAXはDynamoDB互換のインメモリキャッシュでマイクロ秒の読み取りを実現し、変更が少ない。",
+    "キャパシティはスロットリングを減らすがレイテンシをマイクロ秒にはできない。",
+    "可能だがアプリケーション変更が大きい。"
+   ],
+   "tip": "DynamoDBのマイクロ秒＝DAX。",
+   "domain": 3,
+   "answer": 2
+  },
+  {
+   "id": "mc-3-020",
+   "stem": "ある企業のWebアプリケーションで、ピーク時にレスポンスが遅くなっています。アプリケーションはEC2、ALB、Amazon Aurora PostgreSQLで構成されています。運用チームは、遅延の原因が重いSQLクエリなのか、アプリ層の依存サービスなのかを特定したいと考えています。\n最も効果的な組み合わせを2つ選択してください。",
+   "items": [],
+   "choices": [
+    "AWS X-Rayでアプリケーションをトレースし、各依存呼び出しのレイテンシをサービスマップで確認する。",
+    "Amazon RDS Performance Insightsを有効化し、DBロードを占める上位のSQLと待機イベントを確認する。",
+    "AWS CloudTrailの管理イベントを確認する。",
+    "Amazon Macieを有効化する。",
+    "AWS Trusted Advisorのセキュリティチェックを実行する。"
+   ],
+   "explain": [
+    "正解。アプリ層・依存サービスの遅延箇所を特定できる。",
+    "正解。DB側のボトルネックのSQL・待機を特定できる。",
+    "CloudTrailは監査用でパフォーマンス分析向きではない。",
+    "Macieは機密データ検出で無関係。",
+    "セキュリティチェックは遅延分析に使えない。"
+   ],
+   "tip": "ボトルネック特定は「層ごとのツール」で。DB＝Performance Insights、アプリ間＝X-Ray。",
+   "domain": 3,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-021",
+   "stem": "ある企業は、S3バケットに格納されたデータに、顧客の個人情報（PII）が意図せず含まれていないかを継続的に検出し、検出時に通知を受け取りたいと考えています。数百のバケットがあり、運用の手間は最小限にしたいです。\n最適な解決策はどれですか。",
+   "items": [],
+   "choices": [
+    "S3のサーバーアクセスログをAthenaで検索する。",
+    "Amazon Inspectorを有効化してS3バケットをスキャンする。",
+    "GuardDutyでS3のデータを分類する。",
+    "Amazon Macieを有効化して機密データ検出ジョブを設定し、検出結果をEventBridge経由でSNSに通知する。"
+   ],
+   "explain": [
+    "アクセスログにデータ内容は含まれず、PII検出には適さない。",
+    "Inspectorは脆弱性スキャンでS3内のデータ分類は行わない。",
+    "GuardDutyは脅威検出で、データ内容の分類は行わない。",
+    "正解。Macieは機密データの検出と通知ができる。"
+   ],
+   "tip": "S3の機密データ＝Macie。Inspector=脆弱性、GuardDuty=脅威。",
+   "domain": 3,
+   "answer": 4
+  },
+  {
+   "id": "mc-3-022",
+   "stem": "ある企業は、開発チームが作成したIAMロールに広範な権限が付与されていることを懸念しています。ロールは90日間運用されており、その間のCloudTrailログがあります。実際に使用されたアクションのみに絞った最小権限のポリシーを作成したいと考えています。\n最も効率的な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "AdministratorAccessを削除し、ReadOnlyAccessのみを付与する。",
+    "すべてのアクションを手作業でレビューする。",
+    "Trusted Advisorで生成する。",
+    "IAM Access Analyzerのポリシー生成機能を使用して、CloudTrailのアクティビティに基づくポリシーを生成する。"
+   ],
+   "explain": [
+    "必要な書き込み権限が失われて業務が止まる可能性がある。",
+    "時間がかかりミスも発生しやすい。",
+    "Trusted Advisorにはポリシー生成機能がない。",
+    "正解。実際のアクセスに基づく最小権限のポリシーを生成できる。"
+   ],
+   "tip": "実績ベースの最小権限＝Access Analyzerのポリシー生成。",
+   "domain": 3,
+   "answer": 4
+  },
+  {
+   "id": "mc-3-023",
+   "stem": "ある企業は、AWS Organizationsで複数のアカウントを管理しています。セキュリティチームは、すべてのメンバーアカウントでCloudTrailの停止や組織からの離脱をできなくし、さらにS3バケットのパブリックアクセスを組織全体で確実に防止したいと考えています。\n最も適切な対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "管理アカウントにだけSCPを適用する。",
+    "Trusted Advisorのアラートのみに頼る。",
+    "S3のブロックパブリックアクセスを組織の全アカウントで有効にする（アカウントレベルで設定、またはSCPで設定変更を拒否する）。",
+    "各アカウントのIAMユーザーに手動でポリシーを設定する。",
+    "SCPで cloudtrail:StopLogging、cloudtrail:DeleteTrail、organizations:LeaveOrganization を拒否するポリシーをOUにアタッチする。"
+   ],
+   "explain": [
+    "管理アカウントにはSCPが適用されず、メンバーアカウントを制御するものでもない。",
+    "通知のみでは防止にならない。",
+    "正解。ブロックパブリックアクセスを有効化し、SCPで変更を禁止すれば確実。",
+    "手動はスケールせず、アカウント管理者が変更できる。",
+    "正解。SCPで組織全体の上限を強制できる。"
+   ],
+   "tip": "「組織全体で防止」＝SCP（予防）。検知はConfig/Security Hub。",
+   "domain": 3,
+   "answers": [
+    3,
+    5
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-024",
+   "stem": "GuardDutyが、本番VPC内のEC2インスタンスが暗号通貨マイニングのプールと通信している可能性があるという検出結果を出しました。セキュリティチームは、調査のための証拠を保全しつつ、直ちに被害拡大を防ぐ必要があります。\n最初の対応として最も適切なものはどれですか。",
+   "items": [],
+   "choices": [
+    "インスタンスを直ちに終了する。",
+    "インスタンスのIAMロールの削除のみを行う。",
+    "インスタンスを再起動する。",
+    "インスタンスのセキュリティグループを、すべての通信を拒否する隔離用セキュリティグループに変更し、EBSスナップショットを取得して、インスタンスは調査のために保持する。"
+   ],
+   "explain": [
+    "証拠（メモリ、ディスク状態）が失われる。",
+    "通信が継続して被害が続く可能性がある。",
+    "メモリ上の証拠が失われ、マルウェアも残る可能性がある。",
+    "正解。隔離・証拠保全・調査の流れが適切。EventBridgeとLambdaで自動化できる。"
+   ],
+   "tip": "インシデント対応は「隔離→保全→調査→復旧」。終了は最後。",
+   "domain": 3,
+   "answer": 4
+  },
+  {
+   "id": "mc-3-025",
+   "stem": "ある企業は、Amazon EC2、AWS Fargate、AWS Lambdaを使用しており、今後1年でEC2のインスタンスファミリーやリージョンを変更する予定です。コンピュート使用量のベースラインは安定しており、コスト削減を最大化しつつ柔軟性を保ちたいと考えています。\n最適な購入オプションはどれですか。",
+   "items": [],
+   "choices": [
+    "Compute Savings Plans（1年）で時間あたりのコミット額をベースラインに設定する",
+    "Standard Reserved Instances（1年）",
+    "すべてスポットインスタンスにする",
+    "EC2 Instance Savings Plans（3年）"
+   ],
+   "explain": [
+    "正解。ファミリー・リージョンを問わず、EC2、Fargate、Lambdaに適用される。",
+    "ファミリーやリージョン変更に対応できず、FargateとLambdaにも適用されない。",
+    "中断リスクがあり、ベースラインの安定したワークロードの要件に不適。",
+    "特定のリージョンとファミリーに固定され、柔軟性要件に反し、FargateやLambdaにも適用されない。"
+   ],
+   "tip": "柔軟性（ファミリー/リージョン/Fargate/Lambda）＝Compute Savings Plans。",
+   "domain": 3,
+   "answer": 1
+  },
+  {
+   "id": "mc-3-026",
+   "stem": "ある企業は、夜間に実行される大規模なデータ処理バッチジョブを運用しています。ジョブは再試行が可能で中断されても問題なく、各タスクは15分程度で完了します。コストを最小化したいと考えています。\n最適なコンピュート構成はどれですか。",
+   "items": [],
+   "choices": [
+    "オンデマンドインスタンスのみを使用する。",
+    "複数のインスタンスタイプとAZを指定したSpotフリート（price-capacity-optimized）または混合インスタンスポリシーのASGを使用する。",
+    "3年のStandard Reserved Instancesを購入する。",
+    "Dedicated Hostsを使用する。"
+   ],
+   "explain": [
+    "最も高価な選択肢の一つで、コスト最小化に反する。",
+    "正解。中断許容のバッチに最適で、多様化により容量確保と中断低減が可能。",
+    "夜間のみの使用にRIは非効率。",
+    "専有ホストは高価でライセンス要件向け。"
+   ],
+   "tip": "中断許容・再試行可＝Spot（多様化が定石）。",
+   "domain": 3,
+   "answer": 2
+  },
+  {
+   "id": "mc-3-027",
+   "stem": "ある企業は、アクセスパターンが予測できない約100TBのデータをAmazon S3 Standardに保存しています。コストを削減し、取り出し料金が発生しないようにしたいと考えています。また、過去のマルチパートアップロードの失敗によって未完了のパーツが蓄積されています。\n最も効果的な対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "すべてをOne Zone-IAに移行する。",
+    "バケットのバージョニングを有効にする。",
+    "すべてをS3 Glacier Deep Archiveに移行する。",
+    "オブジェクトをS3 Intelligent-Tieringストレージクラスに移行する（ライフサイクルルールで遷移）。",
+    "ライフサイクルルールで、不完全なマルチパートアップロードを一定日数後に中止する設定を追加する。"
+   ],
+   "explain": [
+    "取り出し料金があり、単一AZで耐久性・可用性が下がる。",
+    "バージョニングはコスト削減にならず、むしろ増える可能性がある。",
+    "取り出しに時間がかかり、アクセスが発生しうる要件に合わない。",
+    "正解。アクセスパターンが不明でも、取り出し料金なしで自動最適化される。",
+    "正解。未完了パーツの課金を削除できる。"
+   ],
+   "tip": "「アクセス不明＋取り出し料金なし」＝Intelligent-Tiering。不完全MPU削除もセットで覚える。",
+   "domain": 3,
+   "answers": [
+    4,
+    5
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-028",
+   "stem": "ある企業のプライベートサブネットのEC2インスタンスは、大量のデータをAmazon S3にアップロードしています。AWSの請求を分析したところ、NATゲートウェイのデータ処理料金が高額であることがわかりました。\nコストを最小化する最も簡単な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "AWS Direct Connectを導入する。",
+    "S3 Transfer Accelerationを有効化する。",
+    "VPCにS3のゲートウェイエンドポイントを作成し、プライベートサブネットのルートテーブルに追加する。",
+    "NATゲートウェイをNATインスタンスに置き換える。"
+   ],
+   "explain": [
+    "コストが高く不要。",
+    "加速料金が追加され、NATのコスト問題は解決しない。",
+    "正解。ゲートウェイエンドポイントは無料で、S3トラフィックがNATを経由しなくなる。",
+    "運用負荷が増え、スケーリング・可用性の課題がある。"
+   ],
+   "tip": "S3/DynamoDBへのNAT料金対策＝ゲートウェイエンドポイント。",
+   "domain": 3,
+   "answer": 3
+  },
+  {
+   "id": "mc-3-029",
+   "stem": "ある企業は、開発・検証用の複数のAWSアカウントのコスト管理を強化したいと考えています。月次予算の80%に達する予測が出たときにメール通知し、100%に達した場合は、開発用インスタンスを自動的に停止したいと考えています。\n最も運用効率の良い方法はどれですか。",
+   "items": [],
+   "choices": [
+    "Cost Explorerのレポートを毎日確認する。",
+    "AWS Budgetsで予算（実績/予測）の通知を設定し、100%超過時にはBudgets Actionsで対象のEC2を停止またはIAM/SCPを適用する。",
+    "CloudWatchの請求アラームだけを設定する。",
+    "Trusted Advisorのコストチェックを待つ。"
+   ],
+   "explain": [
+    "手動で、自動停止ができない。",
+    "正解。予測ベースの通知と予算アクションによる自動対応ができる。",
+    "通知のみで自動停止などのアクションがない。",
+    "チェックは即時の予算管理に使えず、自動停止もできない。"
+   ],
+   "tip": "「予算超過で自動アクション」＝AWS Budgets Actions。",
+   "domain": 3,
+   "answer": 2
+  },
+  {
+   "id": "mc-3-030",
+   "stem": "ある企業は、トランジットゲートウェイで接続された2つのVPC間で、アプリケーションが通信できない問題に直面しています。両VPCのセキュリティグループとネットワークACLは許可されているように見えます。運用チームは、パケットを送信せずに構成上の問題箇所を特定したいと考えています。\n最適なツールはどれですか。",
+   "items": [],
+   "choices": [
+    "VPCフローログをAthenaで分析する。",
+    "Amazon Inspectorのネットワーク到達性チェック。",
+    "VPC Reachability Analyzerで送信元と宛先を指定してパスを分析する。",
+    "AWS Trusted Advisorを実行する。"
+   ],
+   "explain": [
+    "実際のトラフィックが発生した結果の記録のみで、構成上のブロック箇所の特定には直接向かない。",
+    "InspectorはEC2のインターネット等への到達性評価で、VPC間の接続診断ツールではない。",
+    "正解。構成を解析し、到達性とブロックしているコンポーネント（ルートテーブル、TGWなど）を示す。",
+    "Trusted Advisorはこのような経路分析をしない。"
+   ],
+   "tip": "「構成を解析して到達可否」＝Reachability Analyzer。",
+   "domain": 3,
+   "answer": 3
+  },
+  {
+   "id": "mc-3-031",
+   "stem": "ある企業のアカウントAのLambda関数が、アカウントBのS3バケットにあるオブジェクトを読み取ろうとしていますが、AccessDeniedになります。バケットはカスタマー管理KMSキーでSSE-KMS暗号化されています。アカウントAのLambda実行ロールはs3:GetObjectを許可されています。\n問題を解決するために必要な対応を2つ選択してください。",
+   "items": [],
+   "choices": [
+    "アカウントBのバケットポリシーで、アカウントAのLambda実行ロールにs3:GetObjectを許可する。",
+    "バケットのパブリックアクセスを許可する。",
+    "アカウントBのKMSキーポリシーで、アカウントAのLambda実行ロールにkms:Decryptを許可し、アカウントAのロールにもkms:Decryptを許可する。",
+    "Lambdaの同時実行数を増やす。",
+    "AWS管理キーに変更し、アカウントAと共有する。"
+   ],
+   "explain": [
+    "正解。クロスアカウントは両側の許可が必要。",
+    "過剰でセキュリティリスクが高い。",
+    "正解。SSE-KMSではKMSの許可も必要。",
+    "AccessDeniedとは無関係。",
+    "AWS管理キーは共有できない。"
+   ],
+   "tip": "クロスアカウント＋SSE-KMS＝「S3の許可」と「KMSの許可」の両方（そして両アカウント側）。",
+   "domain": 3,
+   "answers": [
+    1,
+    3
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-3-032",
+   "stem": "ある企業は、Amazon SQSキューからメッセージを処理するLambda関数を運用しています。処理に最大4分かかることがあり、同じメッセージが重複して処理される現象が発生しています。キューの可視性タイムアウトは30秒です。また、繰り返し失敗するメッセージが他のメッセージ処理を妨げています。\n最適な対応はどれですか。",
+   "items": [],
+   "choices": [
+    "可視性タイムアウトを関数のタイムアウトの6倍以上に設定し、maxReceiveCountを設定したデッドレターキュー（DLQ）を構成する。",
+    "メッセージ保持期間を最短にする。",
+    "キューをFIFOに変更するだけにする。",
+    "Lambdaの同時実行を無制限にする。"
+   ],
+   "explain": [
+    "正解。処理中に再度見えなくなる重複を防ぎ、失敗メッセージはDLQに隔離できる。",
+    "保持期間は無関係で、メッセージの喪失の可能性が高まる。",
+    "FIFOは順序と重複排除の仕組みで、可視性タイムアウト不足の問題を直接解決しない。",
+    "同時実行を増やしても重複処理の原因は解決しない。"
+   ],
+   "tip": "SQS×Lambdaは「可視性タイムアウト≧関数タイムアウトの6倍」と「DLQ」。",
+   "domain": 3,
+   "answer": 1
+  },
+  {
+   "id": "mc-3-033",
+   "stem": "ある企業は、新しく設計した本番ワークロードがAWSのベストプラクティスに沿っているかを、構造化された質問形式でレビューし、高リスクの項目を特定して改善計画を管理したいと考えています。SaaSワークロード特有の観点も確認したいです。\n最適なアプローチはどれですか。",
+   "items": [],
+   "choices": [
+    "Trusted Advisorのみを使用する。",
+    "Amazon Inspectorを実行する。",
+    "AWS Well-Architected Toolでワークロードを定義し、SaaSレンズを追加してレビューし、HRIを改善計画として管理する。",
+    "CloudFormationのドリフト検出を使用する。"
+   ],
+   "explain": [
+    "Trusted Advisorは自動チェックで、設計の質問型レビューや独自のレンズ追加はできない。",
+    "Inspectorは脆弱性スキャン。",
+    "正解。複数の柱とレンズでレビューし、高リスク項目の改善を追跡できる。",
+    "ドリフト検出はIaCの乖離検出で設計レビューではない。"
+   ],
+   "tip": "「構造化レビュー、レンズ、HRI」＝Well-Architected Tool。",
+   "domain": 3,
+   "answer": 3
+  },
+  {
+   "id": "mc-3-034",
+   "stem": "ある企業の運用チームは、CloudWatchの複数のアラーム（CPU高、ディスクキュー長、5xxエラー率）から同じ障害に対して大量の通知を受け取り、アラート疲れが発生しています。本当に対応が必要な状況（CPU高かつ5xxエラー率が高い場合）のみ通知したいと考えています。\n最適な解決策はどれですか。",
+   "items": [],
+   "choices": [
+    "通知先をメールからSMSに変える。",
+    "アラームの評価期間を短くする。",
+    "CloudWatchの複合アラームを作成し、CPU高 AND 5xxエラー率高 の条件でのみ通知し、個別のアラームは通知を抑止する。",
+    "すべてのアラームのしきい値を高くする。"
+   ],
+   "explain": [
+    "通知手段の変更はノイズを減らさない。",
+    "評価期間を短くするとむしろ通知が増える。",
+    "正解。複合アラームで条件を組み合わせノイズを減らせる。",
+    "検知漏れが増えて、根本的な解決にならない。"
+   ],
+   "tip": "アラートノイズ対策＝複合アラーム（AND/OR）。",
+   "domain": 3,
+   "answer": 3
+  }
+ ]
+}

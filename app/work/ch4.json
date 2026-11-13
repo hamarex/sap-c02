@@ -1,0 +1,1311 @@
+{
+ "no": 4,
+ "title": "ワークロードの移行とモダナイゼーションの加速",
+ "lessons": [
+  {
+   "id": "4-1",
+   "title": "移行戦略・7R・評価ツール",
+   "pages": [
+    {
+     "id": "4-1-p1",
+     "title": "7R 移行戦略の使い分け",
+     "html": "<h4>7R とは</h4>\n<p>既存アプリケーションごとに「どう移すか」を決めるフレームワークです。試験では<b class=\"key\">要件(期間・コスト・改修可否)から最適な R を選ぶ</b>問題が頻出します。</p>\n<table><tr><th>R</th><th>内容</th><th>典型シナリオ</th></tr>\n<tr><td><b class=\"key\">Rehost</b></td><td>リフト&シフト。変更せず EC2 へ</td><td>期限が短い・データセンター撤退。MGN を使用</td></tr>\n<tr><td><b class=\"key\">Replatform</b></td><td>リフト&リシェイプ。中核は変えず一部をマネージド化</td><td>自前 MySQL を RDS/Aurora、Tomcat を Elastic Beanstalk へ</td></tr>\n<tr><td><b class=\"key\">Refactor / Re-architect</b></td><td>クラウドネイティブに再設計</td><td>スケーラビリティ要件・俊敏性が最優先</td></tr>\n<tr><td>Repurchase</td><td>SaaS 等の別製品に置換</td><td>自社 CRM を Salesforce 等へ</td></tr>\n<tr><td>Retire</td><td>廃止</td><td>ディスカバリで利用されていないと判明したサーバー</td></tr>\n<tr><td>Retain</td><td>当面オンプレミスに残す</td><td>最近更新したばかり・規制・依存関係が未整理</td></tr>\n<tr><td><b class=\"key\">Relocate</b></td><td>ハイパーバイザーレベルで移す</td><td>VMware Cloud on AWS へ VM をそのまま移動</td></tr></table>\n<h4>判断のコツ</h4>\n<ul><li>「アプリを一切変更できない」「最短で」→ Rehost か Relocate(VMware 環境を維持したいなら Relocate)</li>\n<li>「運用負荷を下げたいが大改修は避けたい」→ Replatform</li>\n<li><span class=\"trap\">落とし穴</span>:Relocate は VMware Cloud on AWS(および Amazon EVS)向けで、EC2 への移行は Rehost</li></ul>",
+     "oxIds": [
+      "ox-4-1-p1-a",
+      "ox-4-1-p1-b",
+      "ox-4-1-p1-c"
+     ]
+    },
+    {
+     "id": "4-1-p2",
+     "title": "ディスカバリと評価:ADS・Migration Evaluator",
+     "html": "<h4>移行前のアセスメント</h4>\n<table><tr><th>サービス</th><th>役割</th></tr>\n<tr><td><b class=\"key\">AWS Application Discovery Service (ADS)</b></td><td>サーバーの構成・利用状況・プロセス・<b class=\"key\">ネットワーク依存関係</b>を収集。結果は Migration Hub に集約</td></tr>\n<tr><td><b class=\"key\">Migration Evaluator</b></td><td>旧 TSO Logic。利用状況から<b class=\"key\">ビジネスケース(TCO 比較・適正サイズ見積り)</b>を作成</td></tr>\n<tr><td>Migration Hub</td><td>移行の進捗を単一ビューで追跡。移行ツールの状況を集約</td></tr></table>\n<h4>ADS の収集方式</h4>\n<ul><li><b class=\"key\">Agentless Collector</b>(VMware vCenter 経由):エージェント不要。構成・CPU/メモリ等の性能データ。<span class=\"trap\">プロセスやネットワーク接続の詳細は取れない</span></li>\n<li><b class=\"key\">Discovery Agent</b>:各サーバーに導入。実行中プロセス・ネットワーク接続(依存関係)まで取得。物理サーバーや非 VMware にも使える</li></ul>\n<h4>使い分け</h4>\n<ul><li>「依存関係を把握してグルーピング(ウェーブ計画)したい」→ ADS エージェント</li>\n<li>「経営層向けにクラウド移行の費用対効果を示したい」→ Migration Evaluator</li>\n<li>「複数ツールを使った移行全体の進捗を一元管理」→ Migration Hub</li>\n<li>Migration Hub のホームリージョンを選択し、移行データはそこに保存される</li></ul>",
+     "oxIds": [
+      "ox-4-1-p2-a",
+      "ox-4-1-p2-b",
+      "ox-4-1-p2-c"
+     ]
+    },
+    {
+     "id": "4-1-p3",
+     "title": "Migration Hub と移行オーケストレーション",
+     "html": "<h4>Migration Hub ファミリー</h4>\n<ul><li>Migration Hub:ADS・MGN・DMS 等の進捗を一元的に追跡。アプリケーション単位でグルーピング</li>\n<li>Migration Hub Orchestrator:移行ワークフローの自動化(例:SAP などのテンプレート、サーバー移行の手順自動化)</li>\n<li><b class=\"key\">Migration Hub Strategy Recommendations</b>:アプリを分析し、<b class=\"key\">推奨する 7R 戦略</b>と移行先を提示(ソースコード・.NET/Java 分析も可能)</li>\n<li><b class=\"key\">Migration Hub Refactor Spaces</b>:<b class=\"key\">Strangler Fig パターン</b>のための環境を構築(API Gateway/NLB・Transit Gateway・クロスアカウント構成を自動化)</li></ul>\n<h4>大規模移行の進め方(ポイント)</h4>\n<ol><li>Assess:ディスカバリ・TCO・7R 決定</li>\n<li>Mobilize:ランディングゾーン構築・体制・スキル整備</li>\n<li>Migrate &amp; Modernize:ウェーブ単位で移行</li></ol>\n<p>AWS の移行支援プログラムとして <b class=\"key\">MAP (Migration Acceleration Program)</b> があり、評価・動員・移行のクレジットや支援を受けられます。</p>\n<span class=\"trap\">落とし穴</span>:「依存するサーバー群を同時に移す」ためウェーブ計画が必要。依存関係を無視した個別移行はレイテンシ問題を招く。<p>※ Migration Hub 関連サービス(Strategy Recommendations、Refactor Spaces など)は、新規提供の状況やコンソール機能が変更される場合があります。試験では各サービスの役割を押さえ、利用可否は最新の公式情報で確認してください。</p>",
+     "oxIds": [
+      "ox-4-1-p3-a",
+      "ox-4-1-p3-b",
+      "ox-4-1-p3-c"
+     ]
+    },
+    {
+     "id": "4-1-p4",
+     "title": "ランディングゾーンとマルチアカウント基盤",
+     "html": "<h4>ランディングゾーン</h4>\n<p>移行先となる、セキュアで複数アカウントに分離された設計済み基盤。移行前(Mobilize)に整えます。</p>\n<table><tr><th>要素</th><th>サービス</th></tr>\n<tr><td>全体構築・ガードレール</td><td><b class=\"key\">AWS Control Tower</b>(Organizations・IAM Identity Center・Config・CloudTrail 等を自動構成)</td></tr>\n<tr><td>新規アカウント払い出し</td><td><b class=\"key\">Account Factory</b>(Service Catalog ベース。Account Factory for Terraform もあり)</td></tr>\n<tr><td>予防的制御</td><td><b class=\"key\">SCP</b>(予防)</td></tr>\n<tr><td>発見的制御</td><td><b class=\"key\">AWS Config ルール</b>(検出)</td></tr>\n<tr><td>集約ログ</td><td>Log Archive アカウント、Audit アカウント</td></tr>\n<tr><td>ネットワーク集約</td><td>Transit Gateway・共有サービス VPC・Direct Connect</td></tr></table>\n<h4>設計の要点</h4>\n<ul><li>Control Tower は<b class=\"key\">Organizations が前提</b>。既存の Organization への導入も可能</li>\n<li>OU 単位でコントロール(旧ガードレール)を適用。予防は SCP、検出は Config</li>\n<li>カスタマイズが必要なら Customizations for Control Tower(CfCT)</li>\n<li><span class=\"trap\">落とし穴</span>:SCP は管理アカウントには効かない。許可を付与するものではなく上限を絞るもの</li></ul>",
+     "oxIds": [
+      "ox-4-1-p4-a",
+      "ox-4-1-p4-b",
+      "ox-4-1-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4-2",
+   "title": "サーバー移行:MGN と VMware",
+   "pages": [
+    {
+     "id": "4-2-p1",
+     "title": "Application Migration Service (MGN) の仕組み",
+     "html": "<h4>MGN とは</h4>\n<p>物理・仮想・他クラウドのサーバーを<b class=\"key\">ブロックレベルで継続レプリケーション</b>し、EC2 へ Rehost するサービス。旧 CloudEndure Migration の後継で、<b class=\"key\">AWS Server Migration Service (SMS) の後継</b>でもあります。</p>\n<h4>流れ</h4>\n<ol><li>ソースサーバーに AWS Replication Agent を導入</li>\n<li>データは対象リージョンの<b class=\"key\">ステージングエリア(低コストなレプリケーションサーバー + EBS)</b>へ継続レプリケーション</li>\n<li><b class=\"key\">テストカットオーバー</b>で起動テスト(本番へ影響なし)</li>\n<li>カットオーバー(本番切替)。ダウンタイムは<b class=\"key\">数分程度</b></li>\n<li>ステージング資源は後で削除</li></ol>\n<h4>ポイント</h4>\n<ul><li>起動テンプレートでインスタンスタイプ・サブネット・SGを事前定義</li>\n<li>OS・アプリ・データはそのまま。移行後の最適化は別途(Rehost)</li>\n<li>VMware 環境では <b class=\"key\">エージェントレス</b>(vCenter クライアント経由のスナップショットベース)も可</li>\n<li>通信は TCP 443(AWS 接続)と 1500(エージェント → レプリケーションサーバー)。Direct Connect/VPN の経由も可</li>\n<li><span class=\"trap\">落とし穴</span>:バックアップ(AMI 作成)で移行するのではなく継続レプリケーションでカットオーバー時間を最小化する</li></ul>",
+     "oxIds": [
+      "ox-4-2-p1-a",
+      "ox-4-2-p1-b",
+      "ox-4-2-p1-c"
+     ]
+    },
+    {
+     "id": "4-2-p2",
+     "title": "MGN の設計判断と DR との違い",
+     "html": "<h4>ネットワーク・セキュリティ設計</h4>\n<ul><li>ステージング用サブネットを準備し、レプリケーションサーバーはそこに起動</li>\n<li>帯域が不足する場合は<b class=\"key\">帯域スロットリング</b>や専用線(Direct Connect)を検討</li>\n<li>IAM ロールで MGN にリソース作成権限を付与(初期化)。<b class=\"key\">暗号化 EBS</b> を使える</li>\n<li>ネットワーク分離環境は <b class=\"key\">Private Link / VPC エンドポイント</b>経由で接続</li></ul>\n<h4>MGN と DRS</h4>\n<table><tr><th></th><th>MGN</th><th>Elastic Disaster Recovery (DRS)</th></tr>\n<tr><td>目的</td><td><b class=\"key\">移行(一度きり)</b></td><td>災害対策(継続保護)</td></tr>\n<tr><td>仕組み</td><td>同じブロックレプリケーション</td><td>同じ。リカバリ用に常時レプリケーション</td></tr>\n<tr><td>終了</td><td>カットオーバー後に完了</td><td>継続。ポイントインタイムリカバリ</td></tr></table>\n<h4>よくある選択</h4>\n<ul><li>「最小ダウンタイムでオンプレの Windows サーバーを EC2 へ」→ MGN</li>\n<li>「VM の OVA/VMDK をインポートして AMI 化」→ VM Import/Export(手動・継続同期なし。小規模向け)</li>\n<li><span class=\"trap\">落とし穴</span>:<b class=\"key\">VM Import/Export</b> は継続レプリケーションがなく、停止時間が長くなる</li></ul>",
+     "oxIds": [
+      "ox-4-2-p2-a",
+      "ox-4-2-p2-b",
+      "ox-4-2-p2-c"
+     ]
+    },
+    {
+     "id": "4-2-p3",
+     "title": "VMware Cloud on AWS・EVS と Relocate",
+     "html": "<h4>VMware 環境の移行選択肢</h4>\n<table><tr><th>選択肢</th><th>特徴</th><th>向く場面</th></tr>\n<tr><td><b class=\"key\">VMware Cloud on AWS</b></td><td>AWS 上のベアメタルで VMware SDDC(vSphere/vSAN/NSX)。オンプレと同じ運用ツール。<b class=\"key\">HCX</b> で vMotion 移行</td><td>アプリ変更不可・VMware 運用を継続・短期間</td></tr>\n<tr><td><b class=\"key\">Amazon Elastic VMware Service (EVS)</b></td><td>お客様の VPC 内で VMware Cloud Foundation を稼働。AWS ネイティブサービスと近接</td><td>VMware を使い続けつつ VPC 内で運用したい</td></tr>\n<tr><td><b class=\"key\">MGN で EC2 へ</b></td><td>VM を EC2 へ Rehost(Hypervisor 変更)</td><td>VMware ライセンスから脱却したい</td></tr></table>\n<h4>ポイント</h4>\n<ul><li>Relocate = ハイパーバイザーレベルで<b class=\"key\">変更なし・IP も維持可能(L2 拡張)</b></li>\n<li>HCX で Bulk Migration / vMotion / Replication Assisted vMotion(RAV)</li>\n<li>VMware Cloud on AWS の SDDC は 接続された VPC(ENI)経由で S3・RDS 等に低レイテンシ接続可能</li>\n<li>オンプレ-AWS 接続は Direct Connect か IPsec VPN</li>\n<li><span class=\"trap\">落とし穴</span>:「VMware ライセンス費用を削減」「EC2 に移したい」→ VMware Cloud on AWS ではなく MGN</li></ul>",
+     "oxIds": [
+      "ox-4-2-p3-a",
+      "ox-4-2-p3-b",
+      "ox-4-2-p3-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4-3",
+   "title": "データベース移行:DMS・SCT・Aurora・DynamoDB",
+   "pages": [
+    {
+     "id": "4-3-p1",
+     "title": "DMS の基本:フルロードと CDC",
+     "html": "<h4>AWS DMS</h4>\n<p>データベース間のデータ移行・継続レプリケーションを行うマネージドサービス。ソース DB を<b class=\"key\">稼働させたまま</b>移行できます。</p>\n<table><tr><th>移行タイプ</th><th>内容</th></tr>\n<tr><td>Full load</td><td>既存データを一括コピー</td></tr>\n<tr><td>CDC only</td><td>変更のみを継続反映</td></tr>\n<tr><td><b class=\"key\">Full load + CDC</b></td><td>最小ダウンタイム移行の定番。ロード中の変更もキャッチアップ</td></tr></table>\n<h4>構成要素</h4>\n<ul><li>レプリケーションインスタンス(または <b class=\"key\">DMS Serverless</b> で自動スケール)</li>\n<li>ソース/ターゲットエンドポイント、移行タスク</li>\n<li>Multi-AZ で可用性確保、データ検証(Validation)</li>\n<li>ターゲットは RDS/Aurora/Redshift/DynamoDB/S3/Kinesis/OpenSearch など</li></ul>\n<h4>CDC の前提条件(ソース側)</h4>\n<ul><li>MySQL:<b class=\"key\">バイナリログ有効・ROW 形式</b></li>\n<li>Oracle:<b class=\"key\">ARCHIVELOG モード + 補足ロギング</b></li>\n<li>PostgreSQL:論理レプリケーション(wal_level=logical)</li>\n<li>SQL Server:ディストリビューション/MS-CDC 等</li></ul>\n<span class=\"trap\">落とし穴</span>:DMS はスキーマ(ストアドプロシージャ等)を完全には変換しない。異種 DB は SCT/Schema Conversion が必要。",
+     "oxIds": [
+      "ox-4-3-p1-a",
+      "ox-4-3-p1-b",
+      "ox-4-3-p1-c"
+     ]
+    },
+    {
+     "id": "4-3-p2",
+     "title": "異種 DB 移行:SCT と Schema Conversion",
+     "html": "<h4>同種 vs 異種</h4>\n<ul><li><b class=\"key\">同種(Homogeneous)</b>:MySQL → Aurora MySQL、Oracle → RDS Oracle など。ネイティブツール(mysqldump、pg_dump、Oracle Data Pump、DMS の homogeneous data migrations)で効率的</li>\n<li><b class=\"key\">異種(Heterogeneous)</b>:Oracle → Aurora PostgreSQL、SQL Server → Aurora PostgreSQL など。<b class=\"key\">スキーマ変換 + データ移行</b>の 2 段階</li></ul>\n<h4>AWS Schema Conversion Tool (SCT)</h4>\n<ul><li>スキーマ(テーブル、ビュー、ストアドプロシージャ、関数)とアプリケーション内の SQL コードを変換</li>\n<li><b class=\"key\">評価レポート</b>で自動変換可能率・手作業が必要な箇所を可視化</li>\n<li>データウェアハウス(Teradata・Oracle DW 等)→ Redshift にも対応。大容量は SCT データ抽出エージェント + <b class=\"key\">Snowball Edge</b></li>\n<li>後継的に DMS Schema Conversion(コンソール内で実行可能)</li></ul>\n<h4>Babelfish for Aurora PostgreSQL</h4>\n<p>SQL Server の T-SQL / TDS プロトコルを<b class=\"key\">アプリ変更最小で</b> Aurora PostgreSQL が受け付ける機能。SQL Server アプリの改修を減らしたい時の選択肢です。</p>\n<h4>典型フロー</h4>\n<ol><li>SCT でスキーマ変換、ターゲットに適用</li><li>DMS で full load + CDC</li><li>アプリをターゲットへ切替(カットオーバー)</li></ol>",
+     "oxIds": [
+      "ox-4-3-p2-a",
+      "ox-4-3-p2-b",
+      "ox-4-3-p2-c"
+     ]
+    },
+    {
+     "id": "4-3-p3",
+     "title": "Aurora への移行と選択",
+     "html": "<h4>Aurora を選ぶ理由</h4>\n<ul><li>MySQL/PostgreSQL 互換、<b class=\"key\">最大 15 リードレプリカ</b>、ストレージは 3 AZ に 6 コピー(最大 128TiB まで自動拡張)</li>\n<li>フェイルオーバーが高速。<b class=\"key\">Aurora Global Database</b> でリージョン間レプリケーション</li>\n<li>Aurora Serverless v2 で可変ワークロードに対応</li></ul>\n<h4>移行手段(MySQL/PostgreSQL → Aurora)</h4>\n<table><tr><th>方式</th><th>ダウンタイム</th><th>備考</th></tr>\n<tr><td>RDS のスナップショットから復元</td><td>中</td><td>RDS MySQL/PostgreSQL → Aurora のスナップショット移行</td></tr>\n<tr><td><b class=\"key\">Aurora リードレプリカ作成 → 昇格</b></td><td>小</td><td>RDS MySQL/PostgreSQL のレプリカとして Aurora を作り、同期後に昇格</td></tr>\n<tr><td>Percona XtraBackup(MySQL)→ S3 → Aurora</td><td>中</td><td>オンプレ MySQL の大容量向け</td></tr>\n<tr><td><b class=\"key\">DMS(full load + CDC)</b></td><td>最小</td><td>オンプレ・他クラウド・異種 DB</td></tr></table>\n<h4>注意</h4>\n<ul><li>Aurora はストレージ自動拡張のため事前の容量設計は不要</li>\n<li>リージョン間移行は Global Database/クロスリージョンレプリカ</li>\n<li><span class=\"trap\">落とし穴</span>:Aurora から RDS 等への逆方向移行は DMS や論理ダンプが基本(Aurora は独自のクラスターボリュームを使う)</li></ul>",
+     "oxIds": [
+      "ox-4-3-p3-a",
+      "ox-4-3-p3-b",
+      "ox-4-3-p3-c"
+     ]
+    },
+    {
+     "id": "4-3-p4",
+     "title": "DynamoDB への移行と NoSQL 化",
+     "html": "<h4>DynamoDB に移すべきケース</h4>\n<ul><li>キーによるアクセスが中心、<b class=\"key\">1桁ミリ秒の低レイテンシ</b>、スケーラビリティが無制限に近い</li>\n<li>サーバー管理不要、グローバルテーブルでマルチリージョンアクティブ</li>\n<li>JOIN や複雑なトランザクション中心なら Aurora の方が適切(<span class=\"trap\">RDB → DynamoDB は設計変更が必要</span>)</li></ul>\n<h4>移行手段</h4>\n<ul><li>DMS:RDB/MongoDB → DynamoDB。<b class=\"key\">オブジェクトマッピング</b>で属性・キーを定義</li>\n<li><b class=\"key\">S3 からのインポート</b>(DynamoDB Import from S3:CSV/DynamoDB JSON/Ion)。<b class=\"key\">テーブル書き込み容量を消費せず</b>新規テーブルへ</li>\n<li>DynamoDB → S3 エクスポート(PITR 有効が前提)</li>\n<li>MongoDB 互換が必要なら <b class=\"key\">Amazon DocumentDB</b></li></ul>\n<h4>設計判断</h4>\n<table><tr><th>要件</th><th>選択</th></tr>\n<tr><td>SQL・JOIN・既存 RDB アプリを維持</td><td>Aurora/RDS</td></tr>\n<tr><td>サーバーレス・単純なキー検索・大規模</td><td>DynamoDB</td></tr>\n<tr><td>MongoDB ワークロード</td><td>DocumentDB</td></tr>\n<tr><td>Cassandra</td><td>Amazon Keyspaces</td></tr></table>",
+     "oxIds": [
+      "ox-4-3-p4-a",
+      "ox-4-3-p4-b",
+      "ox-4-3-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4-4",
+   "title": "データ移行:DataSync・Transfer Family・Snow・Storage Gateway",
+   "pages": [
+    {
+     "id": "4-4-p1",
+     "title": "転送時間の見積りとネットワーク設計",
+     "html": "<h4>まず計算する</h4>\n<p>転送時間 ≒ データ量 ÷ (回線帯域 × 実効利用率)。<b class=\"key\">100TB を 1Gbps で全帯域使うと約 9〜10 日</b>。実効 80% なら約 12 日、他業務と共用なら更に延びます。</p>\n<table><tr><th>状況</th><th>選択</th></tr>\n<tr><td>数 TB 以下・回線に余裕・継続的</td><td>DataSync / S3 直接アップロード</td></tr>\n<tr><td>数十〜数百 TB・回線が細い・期限が短い</td><td><b class=\"key\">Snowball Edge</b>(オフライン)</td></tr>\n<tr><td>継続的に大量転送・安定帯域・低レイテンシ</td><td><b class=\"key\">Direct Connect</b>(専用接続は 1/10/100 Gbps)</td></tr>\n<tr><td>Direct Connect の開通までのつなぎ</td><td>Site-to-Site VPN / Snowball</td></tr></table>\n<h4>設計の要点</h4>\n<ul><li>Direct Connect は開通に<b class=\"key\">数週間〜</b>かかる → 期限が短い場合は Snow が有利</li>\n<li>Direct Connect は暗号化されない → 必要なら <b class=\"key\">VPN over DX</b>(または MACsec 対応専用接続)</li>\n<li>S3 への単一アップロードはマルチパートアップロード、並列化で高速化。遠隔地は <b class=\"key\">S3 Transfer Acceleration</b></li>\n<li>Public VIF で S3 パブリックエンドポイント、Private VIF + S3 インターフェイスエンドポイントでプライベート経由</li></ul>\n<span class=\"trap\">落とし穴</span>:「帯域を増強するしかない」と選ばせても、期限・コスト要件次第で Snow Family が正解になる。",
+     "oxIds": [
+      "ox-4-4-p1-a",
+      "ox-4-4-p1-b",
+      "ox-4-4-p1-c"
+     ]
+    },
+    {
+     "id": "4-4-p2",
+     "title": "AWS DataSync と Transfer Family",
+     "html": "<h4>AWS DataSync</h4>\n<ul><li>オンプレ NFS/SMB/HDFS/オブジェクトストレージ ↔ <b class=\"key\">S3・EFS・FSx</b> を高速・自動化して転送(エージェントをオンプレに配置)</li>\n<li>スケジュール実行、<b class=\"key\">帯域制限</b>、整合性検証、メタデータ(権限・タイムスタンプ)保持、差分転送</li>\n<li>AWS 内ストレージ間(S3 ⇔ EFS など)や他クラウドとも転送可。接続は VPC エンドポイント(プライベート)可</li>\n<li>S3 へ書く際にストレージクラスを指定可能(例:Glacier)</li></ul>\n<h4>AWS Transfer Family</h4>\n<ul><li><b class=\"key\">SFTP / FTPS / FTP / AS2</b> のマネージドサーバー。バックエンドは <b class=\"key\">S3 または EFS</b></li>\n<li>既存パートナーが使う FTP クライアントや認証(<b class=\"key\">Active Directory/カスタム IdP</b>)をそのまま利用</li>\n<li>用途:「パートナーからのファイル受領を S3 へ」「既存 SFTP サーバーの置換」</li></ul>\n<table><tr><th>要件</th><th>サービス</th></tr>\n<tr><td>一括移行・定期同期</td><td>DataSync</td></tr>\n<tr><td>外部パートナーの SFTP 受付</td><td>Transfer Family</td></tr>\n<tr><td>ハイブリッドで S3 をファイル共有として使う</td><td>Storage Gateway</td></tr></table>\n<span class=\"trap\">落とし穴</span>:Transfer Family は移行ツールではなくプロトコル受付サービス。大量の一括移行は DataSync。",
+     "oxIds": [
+      "ox-4-4-p2-a",
+      "ox-4-4-p2-b",
+      "ox-4-4-p2-c"
+     ]
+    },
+    {
+     "id": "4-4-p3",
+     "title": "Snow Family と Storage Gateway",
+     "html": "<h4>Snow Family</h4>\n<table><tr><th>デバイス</th><th>容量・特徴</th></tr>\n<tr><td><b class=\"key\">Snowball Edge Storage Optimized</b></td><td>最大約 210TB の NVMe ストレージ。大容量移行向け</td></tr>\n<tr><td><b class=\"key\">Snowball Edge Compute Optimized</b></td><td>EC2 / Lambda をエッジで実行。GPU 版あり</td></tr>\n<tr><td>Snowcone</td><td>小型(約 8TB HDD / 14TB SSD)。持ち運び・過酷な環境</td></tr></table>\n<ul><li>データは<b class=\"key\">自動で暗号化</b>(KMS)。返送後 S3 に取り込み</li>\n<li>複数台並列で数百 TB〜PB。S3 にインポート後は DataSync で差分同期する運用も</li>\n<li>Snowball Edge は EC2 AMI を載せてエッジ処理、またはクラスターとして耐久性確保</li>\n<li>OpsHub でデバイス管理</li></ul>\n<h4>Storage Gateway</h4>\n<table><tr><th>種類</th><th>用途</th></tr>\n<tr><td><b class=\"key\">S3 File Gateway</b></td><td>NFS/SMB で S3 にオブジェクトとして保存。キャッシュ</td></tr>\n<tr><td>FSx File Gateway</td><td>オンプレから FSx for Windows への低レイテンシアクセス</td></tr>\n<tr><td>Volume Gateway</td><td>iSCSI。<b class=\"key\">Cached</b>(主データは S3、頻用をキャッシュ)/<b class=\"key\">Stored</b>(主データはオンプレ、非同期で S3 にバックアップ)</td></tr>\n<tr><td>Tape Gateway</td><td>既存バックアップソフトの VTL を S3/Glacier へ</td></tr></table>\n<span class=\"trap\">落とし穴</span>:Snowmobile は提供終了(新規利用不可)。Snow Family は提供状況が変わるため、試験では「オフライン大容量転送」の位置付けで理解する。",
+     "oxIds": [
+      "ox-4-4-p3-a",
+      "ox-4-4-p3-b",
+      "ox-4-4-p3-c"
+     ]
+    },
+    {
+     "id": "4-4-p4",
+     "title": "移行ツールの選択まとめ",
+     "html": "<h4>決め手早見表</h4>\n<table><tr><th>シナリオ</th><th>最適解</th></tr>\n<tr><td>オンプレ NFS → S3/EFS に定期同期</td><td><b class=\"key\">DataSync</b></td></tr>\n<tr><td>回線 100Mbps で 200TB、1 か月以内</td><td><b class=\"key\">Snowball Edge</b>(複数台)</td></tr>\n<tr><td>オンプレのアプリは残しつつ、バックアップ先に S3 をファイルとして使いたい</td><td>S3 File Gateway</td></tr>\n<tr><td>既存バックアップのテープ廃止</td><td><b class=\"key\">Tape Gateway</b></td></tr>\n<tr><td>FTP 受付を AWS へ</td><td>Transfer Family</td></tr>\n<tr><td>データベースを無停止で</td><td>DMS</td></tr>\n<tr><td>サーバーごと</td><td>MGN</td></tr>\n<tr><td>Windows ファイルサーバーを置換</td><td>FSx for Windows(DataSync で移行)</td></tr>\n<tr><td>HPC・Lustre 互換</td><td>FSx for Lustre</td></tr></table>\n<h4>引っ掛けパターン</h4>\n<ul><li><span class=\"trap\">Storage Gateway はデータ移行ツールではなく、ハイブリッド統合(継続利用)のためのもの</span></li>\n<li>Snow は<b class=\"key\">往復の配送日数</b>があるため、「数日以内」の要件には向かない</li>\n<li>DataSync はファイルレベル。DB やサーバーイメージは対象外</li>\n<li>混在(Snow で初期転送 + DataSync/DMS で差分)はよく出る正解パターン</li></ul>",
+     "oxIds": [
+      "ox-4-4-p4-a",
+      "ox-4-4-p4-b",
+      "ox-4-4-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4-5",
+   "title": "モダナイゼーション:コンテナ・サーバーレス・メインフレーム",
+   "pages": [
+    {
+     "id": "4-5-p1",
+     "title": "モダナイゼーションの進め方と Strangler Fig",
+     "html": "<h4>モダナイゼーションの方向性</h4>\n<ul><li><b class=\"key\">コンテナ化</b>:ECS / EKS / Fargate。OS 依存のアプリを移植性高く</li>\n<li><b class=\"key\">サーバーレス化</b>:Lambda・API Gateway・Step Functions・EventBridge・DynamoDB</li>\n<li>マネージド DB 化:RDS・Aurora・DynamoDB</li>\n<li>マイクロサービス化:疎結合(SQS/SNS/EventBridge)</li></ul>\n<h4>Strangler Fig パターン</h4>\n<p>モノリスを<b class=\"key\">一括書き換えせず</b>、機能単位で新サービスへ段階的に切り出し、ルーティングを徐々に新側へ切替える手法。</p>\n<ul><li>前段に <b class=\"key\">ALB / API Gateway / CloudFront</b> を置き、パス単位で新旧に振り分け</li>\n<li>リスクを小さくでき、いつでもロールバック可能</li>\n<li>AWS では <b class=\"key\">Migration Hub Refactor Spaces</b> が環境構築を自動化</li>\n<li>データ同期に DMS CDC や EventBridge を使うことも</li></ul>\n<h4>判断基準</h4>\n<table><tr><th>要件</th><th>方針</th></tr>\n<tr><td>大規模システムを止められず段階移行</td><td>Strangler Fig</td></tr>\n<tr><td>全面刷新に数年・ビジネスリスクが高い</td><td>Strangler Fig で段階化</td></tr>\n<tr><td>短期間で移行</td><td>Rehost 後にモダナイズ</td></tr></table>\n<span class=\"trap\">落とし穴</span>:「ビッグバン書き換え」は選択肢にあっても、ダウンタイム・リスク要件では誤答になりやすい。",
+     "oxIds": [
+      "ox-4-5-p1-a",
+      "ox-4-5-p1-b",
+      "ox-4-5-p1-c"
+     ]
+    },
+    {
+     "id": "4-5-p2",
+     "title": "コンテナ化:App2Container と ECS/EKS/Fargate",
+     "html": "<h4>AWS App2Container (A2C)</h4>\n<ul><li>オンプレ/EC2 上の<b class=\"key\">.NET (Windows) / Java アプリ</b>を分析し、コンテナイメージ + デプロイ成果物を自動生成するコマンドラインツール</li>\n<li>出力は ECR 登録・ECS/EKS 向け CloudFormation/Kubernetes マニフェスト、CI/CD パイプライン</li>\n<li>ソースコード改修不要。<b class=\"key\">コンテナ化を最小努力で</b>始めたい時の答え</li></ul>\n<h4>コンテナ基盤の選択</h4>\n<table><tr><th>選択</th><th>特徴</th></tr>\n<tr><td><b class=\"key\">ECS on Fargate</b></td><td>サーバー管理不要。AWS ネイティブ、シンプル</td></tr>\n<tr><td>ECS on EC2</td><td>ホストの細かい制御、GPU、コスト最適化(Spot・RI)</td></tr>\n<tr><td><b class=\"key\">EKS</b></td><td>Kubernetes 互換・マルチクラウド/オンプレ(EKS Anywhere)との一貫性</td></tr>\n<tr><td><b class=\"key\">App Runner</b></td><td>コンテナ/ソースから Web アプリを最も簡単に公開</td></tr>\n<tr><td><b class=\"key\">Elastic Beanstalk</b></td><td>コード(Java/.NET 等)をアップするだけ。Replatform</td></tr></table>\n<h4>ポイント</h4>\n<ul><li>Windows コンテナは EC2 起動タイプや Fargate(Windows)でサポート</li>\n<li>既存が Kubernetes → EKS、AWS 固有で単純 → ECS</li>\n<li>イメージは ECR(スキャン・ライフサイクル・レプリケーション)</li></ul>",
+     "oxIds": [
+      "ox-4-5-p2-a",
+      "ox-4-5-p2-b",
+      "ox-4-5-p2-c"
+     ]
+    },
+    {
+     "id": "4-5-p3",
+     "title": "サーバーレス化とアプリ・データのモダナイズ",
+     "html": "<h4>サーバーレス移行の考え方</h4>\n<ul><li>バッチ・イベント駆動 → <b class=\"key\">Lambda + EventBridge / S3 / SQS</b></li>\n<li>REST API → <b class=\"key\">API Gateway + Lambda</b>(または Lambda 関数 URL)</li>\n<li>長時間ワークフロー・オーケストレーション → <b class=\"key\">Step Functions</b></li>\n<li>メッセージング(ActiveMQ/RabbitMQ 等) → <b class=\"key\">Amazon MQ</b>(互換のまま Replatform)/ SQS・SNS(Refactor)</li>\n<li>ETL → AWS Glue、ストリーム → Kinesis / MSK</li></ul>\n<h4>Lambda の制約(引っ掛け)</h4>\n<ul><li>最大実行時間 <b class=\"key\">15 分</b>。これを超える処理は Fargate/Step Functions/Batch</li>\n<li>メモリは最大 10GB、/tmp は最大 10GB、デプロイパッケージ制限あり(コンテナイメージは 10GB)</li>\n<li>コールドスタート対策に Provisioned Concurrency / SnapStart</li></ul>\n<h4>データのモダナイズ</h4>\n<table><tr><th>現状</th><th>移行先</th></tr>\n<tr><td>自前の Hadoop</td><td>EMR(+ S3 データレイク)</td></tr>\n<tr><td>オンプレ DWH</td><td>Redshift</td></tr>\n<tr><td>Redis/Memcached 自前</td><td>ElastiCache / MemoryDB</td></tr>\n<tr><td>Elasticsearch 自前</td><td>OpenSearch Service</td></tr>\n<tr><td>Kafka 自前</td><td>MSK</td></tr></table>",
+     "oxIds": [
+      "ox-4-5-p3-a",
+      "ox-4-5-p3-b",
+      "ox-4-5-p3-c"
+     ]
+    },
+    {
+     "id": "4-5-p4",
+     "title": "メインフレーム移行 (M2)",
+     "html": "<h4>AWS Mainframe Modernization (M2)</h4>\n<p>COBOL / PL/I 等のメインフレームアプリを AWS に移行・近代化するマネージドサービス。2 つのパターン:</p>\n<table><tr><th>パターン</th><th>内容</th></tr>\n<tr><td><b class=\"key\">Replatform</b>(再プラットフォーム)</td><td>COBOL コードを<b class=\"key\">ほぼそのまま</b>、互換ランタイム(Rocket Software 等)上で実行。改修を最小に</td></tr>\n<tr><td><b class=\"key\">Automated Refactor</b>(自動リファクタリング)</td><td>COBOL を <b class=\"key\">Java</b> に自動変換(AWS Blu Age)。クラウドネイティブ化・マイクロサービス化を見据える</td></tr></table>\n<h4>周辺のポイント</h4>\n<ul><li>M2 には開発/テスト/ランタイム環境が含まれ、<b class=\"key\">Multi-AZ・自動スケーリング</b>に対応</li>\n<li>データ:VSAM・DB2 → DMS 等で Aurora / RDS / DynamoDB へ。ファイルは S3・EFS・FSx</li>\n<li>ジョブ(JCL)・オンライン(CICS)を取り込む</li>\n<li>評価は Migration Hub Strategy Recommendations / AWS Transform 等で</li>\n<li>ライセンス・ハードウェア保守費(MIPS 課金)の削減が主な動機</li></ul>\n<h4>選択の判断</h4>\n<ul><li>「期間・リスク最小、コード変更したくない」→ Replatform</li>\n<li>「Java 化して継続的にモダナイズ、スキル確保」→ Automated Refactor</li>\n<li><span class=\"trap\">落とし穴</span>:EC2 に Hercules などのエミュレータを手作りする案は運用負荷が高く、マネージドの M2 が優先</li></ul>",
+     "oxIds": [
+      "ox-4-5-p4-a",
+      "ox-4-5-p4-b",
+      "ox-4-5-p4-c"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4-6",
+   "title": "ライセンス・コスト見積り・TCO",
+   "pages": [
+    {
+     "id": "4-6-p1",
+     "title": "ライセンス戦略:BYOL・License Included・Dedicated Host",
+     "html": "<h4>基本の選択</h4>\n<table><tr><th>モデル</th><th>内容</th></tr>\n<tr><td>License Included (LI)</td><td>Windows Server / SQL Server 等の料金がインスタンス料金に含まれる。従量で簡単</td></tr>\n<tr><td><b class=\"key\">BYOL</b></td><td>既存ライセンスを持ち込む。ライセンス条件(ソケット/コア固定)を満たす必要あり</td></tr></table>\n<h4>Dedicated Host / Dedicated Instance</h4>\n<ul><li><b class=\"key\">Dedicated Host</b>:物理サーバー全体を専有。<b class=\"key\">ソケット・コア・ホスト ID が可視化</b>され、ソケット/コア単位のライセンス(Windows Server、SQL Server、Oracle の一部など)の BYOL に必要</li>\n<li><b class=\"key\">Dedicated Instance</b>:ハードウェア専有だがホスト ID・ソケット可視化なし。<span class=\"trap\">BYOL には不十分な場合が多い</span></li>\n<li><b class=\"key\">AWS License Manager</b>:ライセンスルールを定義し使用量を追跡・制限(Dedicated Host の自動管理、組織横断)</li></ul>\n<h4>RDS でのライセンス</h4>\n<ul><li>RDS for Oracle:LI(SE2)または BYOL(SE2・EE)</li>\n<li>RDS for SQL Server:<b class=\"key\">License Included のみ</b>(通常の RDS では BYOL 不可。Dedicated Host を使いたい、BYOL が必要 → RDS Custom for SQL Server 等 or EC2)</li>\n<li>Aurora/PostgreSQL へ移行すれば商用 DB ライセンス費用を削減可能</li></ul>\n<h4>コスト最適化</h4>\n<ul><li>SQL Server on EC2:Optimize CPUs で vCPU を減らし(コア数削減)ライセンスを節約</li>\n<li>Windows の LI を使う vs BYOL は利用規約・ソフトウェアアシュアランス(SA)条件に依存 → License Mobility の適格性</li></ul>",
+     "oxIds": [
+      "ox-4-6-p1-a",
+      "ox-4-6-p1-b",
+      "ox-4-6-p1-c"
+     ]
+    },
+    {
+     "id": "4-6-p2",
+     "title": "コスト見積りと TCO の考え方",
+     "html": "<h4>TCO に含めるべき項目</h4>\n<ul><li>オンプレ側:ハードウェア償却、データセンター(電力・冷却・ラック)、保守、ネットワーク、<b class=\"key\">人件費</b>、ライセンス、DR 拠点</li>\n<li>AWS 側:コンピュート、ストレージ、データ転送(<b class=\"key\">アウトバウンド</b>課金)、サポート、移行費用、<b class=\"key\">二重稼働期間</b></li>\n<li><b class=\"key\">Migration Evaluator</b> が利用実績からオンプレ費用と AWS 費用を比較するビジネスケースを作成</li></ul>\n<h4>ツールの使い分け</h4>\n<table><tr><th>ツール</th><th>用途</th></tr>\n<tr><td>AWS Pricing Calculator</td><td>構成ごとの月額見積り</td></tr>\n<tr><td>Migration Evaluator</td><td>既存環境の実測に基づく TCO/ビジネスケース</td></tr>\n<tr><td>Cost Explorer / Budgets</td><td>移行後のコスト把握・予算管理</td></tr>\n<tr><td>Compute Optimizer</td><td>移行後のライトサイジング</td></tr>\n<tr><td>Savings Plans / RI</td><td>安定ワークロードの割引(1年・3年)</td></tr></table>\n<h4>コスト削減の判断</h4>\n<ul><li>利用率が低いサーバーは<b class=\"key\">ライトサイジング</b>してから購入オプションを決める(順序が重要)</li>\n<li>DR 用は Pilot Light/Warm Standby でオンプレ DR 拠点より安価に</li>\n<li>データ転送:インバウンドは無料、<b class=\"key\">インターネットへのアウトバウンドは有料</b>。Direct Connect 経由は転送単価が低い</li>\n<li><span class=\"trap\">落とし穴</span>:移行直後はオンプレ・AWS の二重コストが発生する。TCO では移行期間も含める</li></ul>",
+     "oxIds": [
+      "ox-4-6-p2-a",
+      "ox-4-6-p2-b",
+      "ox-4-6-p2-c"
+     ]
+    },
+    {
+     "id": "4-6-p3",
+     "title": "移行プロジェクトの落とし穴総まとめ",
+     "html": "<h4>試験でよく出る判断軸</h4>\n<table><tr><th>キーワード</th><th>答えの方向性</th></tr>\n<tr><td>最小ダウンタイム・DB</td><td>DMS (full load + CDC)</td></tr>\n<tr><td>最小ダウンタイム・サーバー</td><td>MGN</td></tr>\n<tr><td>アプリ変更不可・VMware</td><td>VMware Cloud on AWS(Relocate)</td></tr>\n<tr><td>異種 DB・スキーマ変換</td><td>SCT / DMS Schema Conversion</td></tr>\n<tr><td>依存関係の把握</td><td>ADS(エージェント方式)</td></tr>\n<tr><td>運用負荷削減・最小改修</td><td>Replatform(RDS・Beanstalk)</td></tr>\n<tr><td>段階的刷新</td><td>Strangler Fig</td></tr>\n<tr><td>COBOL</td><td>M2</td></tr>\n<tr><td>BYOL・ソケット単位</td><td>Dedicated Host + License Manager</td></tr></table>\n<h4>セキュリティと運用の落とし穴</h4>\n<ul><li>移行中の転送データは<b class=\"key\">TLS/暗号化</b>を確保(DMS は SSL、Snow は自動暗号化)</li>\n<li>DMS のレプリケーションインスタンスは<b class=\"key\">ソースとターゲットに到達可能な VPC・SG</b>に配置</li>\n<li>カットオーバー前に<b class=\"key\">ロールバック計画</b>とテストを実施</li>\n<li>移行後の最適化(Well-Architected 再評価)までが移行プロジェクト</li></ul>\n<h4>最後に:要件キーワードを拾う</h4>\n<p>「最短」「最小コスト」「運用負荷最小」「アプリ変更なし」「無停止」のうち<b class=\"key\">最優先の制約</b>を見つけ、他の選択肢を消去していきます。</p>",
+     "oxIds": [
+      "ox-4-6-p3-a",
+      "ox-4-6-p3-b",
+      "ox-4-6-p3-c"
+     ]
+    }
+   ]
+  }
+ ],
+ "ox": [
+  {
+   "id": "ox-4-1-p1-a",
+   "lesson": "4-1",
+   "text": "Relocate は、VM を変更せずに EC2 インスタンスへ移行する戦略である。",
+   "answer": false,
+   "explain": "Relocate はハイパーバイザーレベルの移動(VMware Cloud on AWS 等)。EC2 への変更なし移行は Rehost。"
+  },
+  {
+   "id": "ox-4-1-p1-b",
+   "lesson": "4-1",
+   "text": "オンプレミスの MySQL を Amazon RDS for MySQL に移すのは典型的な Replatform である。",
+   "answer": true,
+   "explain": "アプリの中核は変えずデータベースだけマネージド化するため Replatform。"
+  },
+  {
+   "id": "ox-4-1-p1-c",
+   "lesson": "4-1",
+   "text": "ディスカバリで利用実績がないと判明したサーバーは Retain に分類する。",
+   "answer": false,
+   "explain": "利用されていないものは Retire(廃止)。Retain は残すと決めたもの。"
+  },
+  {
+   "id": "ox-4-1-p2-a",
+   "lesson": "4-1",
+   "text": "Application Discovery Service のエージェントレスコレクターは、サーバー上のプロセスとネットワーク依存関係の詳細を収集できる。",
+   "answer": false,
+   "explain": "プロセス・ネットワーク接続の詳細はエージェント方式の機能。"
+  },
+  {
+   "id": "ox-4-1-p2-b",
+   "lesson": "4-1",
+   "text": "Migration Evaluator は現状の利用状況に基づく TCO 比較のビジネスケース作成に使う。",
+   "answer": true,
+   "explain": "Migration Evaluator の主目的。"
+  },
+  {
+   "id": "ox-4-1-p2-c",
+   "lesson": "4-1",
+   "text": "Migration Hub は移行そのものを実行するサービスである。",
+   "answer": false,
+   "explain": "Migration Hub は進捗追跡・可視化の集約先で、実際の移行は MGN や DMS 等が行う。"
+  },
+  {
+   "id": "ox-4-1-p3-a",
+   "lesson": "4-1",
+   "text": "Migration Hub Strategy Recommendations は、アプリごとに推奨の移行戦略を提示する。",
+   "answer": true,
+   "explain": "分析に基づき 7R の推奨を提示する。"
+  },
+  {
+   "id": "ox-4-1-p3-b",
+   "lesson": "4-1",
+   "text": "Strangler Fig パターンのルーティング環境構築を支援するのは Migration Hub Orchestrator である。",
+   "answer": false,
+   "explain": "Refactor Spaces が該当。Orchestrator はワークフロー自動化。"
+  },
+  {
+   "id": "ox-4-1-p3-c",
+   "lesson": "4-1",
+   "text": "MAP は移行の評価・動員・実行フェーズを支援する AWS のプログラムである。",
+   "answer": true,
+   "explain": "クレジット等の支援を含む。"
+  },
+  {
+   "id": "ox-4-1-p4-a",
+   "lesson": "4-1",
+   "text": "Control Tower の予防的コントロールは SCP、発見的コントロールは AWS Config ルールで実装される。",
+   "answer": true,
+   "explain": "その通り。"
+  },
+  {
+   "id": "ox-4-1-p4-b",
+   "lesson": "4-1",
+   "text": "SCP は Organizations の管理アカウントにも適用される。",
+   "answer": false,
+   "explain": "管理アカウントには適用されない。"
+  },
+  {
+   "id": "ox-4-1-p4-c",
+   "lesson": "4-1",
+   "text": "ランディングゾーンは、移行を開始した後に整備するのが一般的である。",
+   "answer": false,
+   "explain": "移行前の Mobilize フェーズで整備する。"
+  },
+  {
+   "id": "ox-4-2-p1-a",
+   "lesson": "4-2",
+   "text": "MGN はスナップショット取得後に一度だけコピーし、変更差分は反映しない。",
+   "answer": false,
+   "explain": "継続的なブロックレベルレプリケーションで差分も反映する。"
+  },
+  {
+   "id": "ox-4-2-p1-b",
+   "lesson": "4-2",
+   "text": "MGN のテストカットオーバーは、本番サーバーの稼働に影響せず実施できる。",
+   "answer": true,
+   "explain": "テストインスタンスを起動して検証するだけで、ソースは稼働し続ける。"
+  },
+  {
+   "id": "ox-4-2-p1-c",
+   "lesson": "4-2",
+   "text": "MGN は AWS Server Migration Service (SMS) の後継サービスである。",
+   "answer": true,
+   "explain": "SMS は終了し MGN へ移行。"
+  },
+  {
+   "id": "ox-4-2-p2-a",
+   "lesson": "4-2",
+   "text": "Elastic Disaster Recovery と MGN は同様のレプリケーション技術を用いるが、目的が異なる。",
+   "answer": true,
+   "explain": "移行か継続的 DR かの違い。"
+  },
+  {
+   "id": "ox-4-2-p2-b",
+   "lesson": "4-2",
+   "text": "VM Import/Export は継続的な差分レプリケーションにより最小ダウンタイム移行を実現する。",
+   "answer": false,
+   "explain": "VM Import/Export は継続同期を行わない。"
+  },
+  {
+   "id": "ox-4-2-p2-c",
+   "lesson": "4-2",
+   "text": "MGN のレプリケーションサーバーはステージングサブネットに作成される。",
+   "answer": true,
+   "explain": "低コストなステージングエリアを使う。"
+  },
+  {
+   "id": "ox-4-2-p3-a",
+   "lesson": "4-2",
+   "text": "VMware Cloud on AWS では、HCX を使って VM を再構成せずにオンプレミスから移行できる。",
+   "answer": true,
+   "explain": "HCX による vMotion/一括移行が可能。"
+  },
+  {
+   "id": "ox-4-2-p3-b",
+   "lesson": "4-2",
+   "text": "VMware ライセンスから脱却したい場合は VMware Cloud on AWS が最適である。",
+   "answer": false,
+   "explain": "EC2 へ Rehost する MGN が適切。"
+  },
+  {
+   "id": "ox-4-2-p3-c",
+   "lesson": "4-2",
+   "text": "Amazon EVS は VMware Cloud Foundation をお客様の Amazon VPC 内で稼働させる。",
+   "answer": true,
+   "explain": "EVS の特徴。"
+  },
+  {
+   "id": "ox-4-3-p1-a",
+   "lesson": "4-3",
+   "text": "Full load + CDC を使うと、移行中もソース DB の更新を継続できる。",
+   "answer": true,
+   "explain": "CDC で変更をキャッチアップする。"
+  },
+  {
+   "id": "ox-4-3-p1-b",
+   "lesson": "4-3",
+   "text": "MySQL ソースで CDC を使う場合、バイナリログは STATEMENT 形式にする必要がある。",
+   "answer": false,
+   "explain": "ROW 形式が必要。"
+  },
+  {
+   "id": "ox-4-3-p1-c",
+   "lesson": "4-3",
+   "text": "DMS は異種 DB 間のストアドプロシージャを自動で完全変換する。",
+   "answer": false,
+   "explain": "スキーマ変換は SCT/DMS Schema Conversion の役割で、完全自動とは限らない。"
+  },
+  {
+   "id": "ox-4-3-p2-a",
+   "lesson": "4-3",
+   "text": "SCT はアプリケーションコード内の SQL を変換する機能も持つ。",
+   "answer": true,
+   "explain": "埋め込み SQL の変換と評価が可能。"
+  },
+  {
+   "id": "ox-4-3-p2-b",
+   "lesson": "4-3",
+   "text": "Babelfish for Aurora PostgreSQL は、SQL Server アプリの T-SQL をほぼ変更せずに利用可能にする機能である。",
+   "answer": true,
+   "explain": "TDS・T-SQL 互換。"
+  },
+  {
+   "id": "ox-4-3-p2-c",
+   "lesson": "4-3",
+   "text": "Oracle から Aurora PostgreSQL への移行では、DMS だけでスキーマ変換まで完結する。",
+   "answer": false,
+   "explain": "スキーマ変換には SCT/Schema Conversion を併用する。"
+  },
+  {
+   "id": "ox-4-3-p3-a",
+   "lesson": "4-3",
+   "text": "RDS for MySQL から Aurora MySQL へは、Aurora リードレプリカを作成して昇格する方法でダウンタイムを小さくできる。",
+   "answer": true,
+   "explain": "レプリケーション同期後に昇格する。"
+  },
+  {
+   "id": "ox-4-3-p3-b",
+   "lesson": "4-3",
+   "text": "Aurora は事前に必要なストレージ容量を指定してプロビジョニングする必要がある。",
+   "answer": false,
+   "explain": "自動拡張される。"
+  },
+  {
+   "id": "ox-4-3-p3-c",
+   "lesson": "4-3",
+   "text": "オンプレミスの Oracle から Aurora MySQL への移行には SCT と DMS を使う。",
+   "answer": true,
+   "explain": "異種移行の定番。"
+  },
+  {
+   "id": "ox-4-3-p4-a",
+   "lesson": "4-3",
+   "text": "DynamoDB の S3 インポートは新規テーブルを作成し、書き込みキャパシティを消費しない。",
+   "answer": true,
+   "explain": "インポート機能の特徴。"
+  },
+  {
+   "id": "ox-4-3-p4-b",
+   "lesson": "4-3",
+   "text": "RDB から DynamoDB への移行は、スキーマ変更なしで DMS により自動完結する。",
+   "answer": false,
+   "explain": "キー設計・オブジェクトマッピングなどデータモデル再設計が必要。"
+  },
+  {
+   "id": "ox-4-3-p4-c",
+   "lesson": "4-3",
+   "text": "MongoDB 互換のワークロードには Amazon DocumentDB が適している。",
+   "answer": true,
+   "explain": "MongoDB API 互換。"
+  },
+  {
+   "id": "ox-4-4-p1-a",
+   "lesson": "4-4",
+   "text": "100TB を 1Gbps 回線で転送する場合、理論上の最短でも約 9 日かかる。",
+   "answer": true,
+   "explain": "800,000Gb ÷ 1Gbps ≒ 約 9.3 日。"
+  },
+  {
+   "id": "ox-4-4-p1-b",
+   "lesson": "4-4",
+   "text": "Direct Connect の接続は標準で IPsec により暗号化される。",
+   "answer": false,
+   "explain": "標準では暗号化されない。VPN over DX 等を併用する。"
+  },
+  {
+   "id": "ox-4-4-p1-c",
+   "lesson": "4-4",
+   "text": "転送期限が短く回線が細い場合は、オフライン転送の Snowball Edge が有力である。",
+   "answer": true,
+   "explain": "ネットワーク転送が間に合わない場合。"
+  },
+  {
+   "id": "ox-4-4-p2-a",
+   "lesson": "4-4",
+   "text": "DataSync は転送データの整合性検証と帯域制限をサポートする。",
+   "answer": true,
+   "explain": "いずれも標準機能。"
+  },
+  {
+   "id": "ox-4-4-p2-b",
+   "lesson": "4-4",
+   "text": "Transfer Family は SFTP をサポートするが、バックエンドストレージは S3 のみである。",
+   "answer": false,
+   "explain": "EFS もサポート。"
+  },
+  {
+   "id": "ox-4-4-p2-c",
+   "lesson": "4-4",
+   "text": "既存パートナーが利用中の SFTP 受付を AWS に置換するには Transfer Family が適している。",
+   "answer": true,
+   "explain": "クライアント側変更を最小にできる。"
+  },
+  {
+   "id": "ox-4-4-p3-a",
+   "lesson": "4-4",
+   "text": "Volume Gateway の Stored モードでは、主データはオンプレミスに保持され、S3 に非同期バックアップされる。",
+   "answer": true,
+   "explain": "Cached は主データが S3 側。"
+  },
+  {
+   "id": "ox-4-4-p3-b",
+   "lesson": "4-4",
+   "text": "Tape Gateway は既存のバックアップソフトウェアを変更せずにクラウドへテープ保管できる。",
+   "answer": true,
+   "explain": "VTL として動作する。"
+  },
+  {
+   "id": "ox-4-4-p3-c",
+   "lesson": "4-4",
+   "text": "Snowball Edge に保存されたデータは暗号化されず、返送前に手動で暗号化する必要がある。",
+   "answer": false,
+   "explain": "自動で暗号化される。"
+  },
+  {
+   "id": "ox-4-4-p4-a",
+   "lesson": "4-4",
+   "text": "Storage Gateway は大規模データ移行を目的として最も一般的に使われる。",
+   "answer": false,
+   "explain": "ハイブリッド統合・継続利用が主目的。"
+  },
+  {
+   "id": "ox-4-4-p4-b",
+   "lesson": "4-4",
+   "text": "初期データを Snowball Edge で送り、その後の差分を DataSync で同期する構成は有効である。",
+   "answer": true,
+   "explain": "一般的な併用パターン。"
+  },
+  {
+   "id": "ox-4-4-p4-c",
+   "lesson": "4-4",
+   "text": "DataSync はデータベースエンジンの変更を伴う移行に使える。",
+   "answer": false,
+   "explain": "ファイルレベルの転送。DB は DMS。"
+  },
+  {
+   "id": "ox-4-5-p1-a",
+   "lesson": "4-5",
+   "text": "Strangler Fig パターンでは、旧システムを一度に停止して全機能を新システムに切り替える。",
+   "answer": false,
+   "explain": "段階的に機能を切り出して置換する。"
+  },
+  {
+   "id": "ox-4-5-p1-b",
+   "lesson": "4-5",
+   "text": "Strangler Fig では前段の ALB などでパス単位にトラフィックを新旧へ振り分けられる。",
+   "answer": true,
+   "explain": "ルーティングで段階移行。"
+  },
+  {
+   "id": "ox-4-5-p1-c",
+   "lesson": "4-5",
+   "text": "Refactor Spaces は Strangler Fig 実装用の環境構築を支援する。",
+   "answer": true,
+   "explain": "Migration Hub の機能。"
+  },
+  {
+   "id": "ox-4-5-p2-a",
+   "lesson": "4-5",
+   "text": "App2Container は .NET と Java アプリケーションのコンテナ化を支援する。",
+   "answer": true,
+   "explain": "分析して Dockerfile/デプロイ成果物を生成する。"
+  },
+  {
+   "id": "ox-4-5-p2-b",
+   "lesson": "4-5",
+   "text": "既存の Kubernetes マニフェスト資産をそのまま使いたい場合は ECS が最適である。",
+   "answer": false,
+   "explain": "Kubernetes 互換の EKS が適切。"
+  },
+  {
+   "id": "ox-4-5-p2-c",
+   "lesson": "4-5",
+   "text": "Fargate を使うとコンテナ実行のためのサーバー(EC2)管理が不要になる。",
+   "answer": true,
+   "explain": "サーバーレスコンピュート。"
+  },
+  {
+   "id": "ox-4-5-p3-a",
+   "lesson": "4-5",
+   "text": "Lambda は 1 回の実行に最大 15 分まで使用できる。",
+   "answer": true,
+   "explain": "タイムアウト上限は 15 分。"
+  },
+  {
+   "id": "ox-4-5-p3-b",
+   "lesson": "4-5",
+   "text": "ActiveMQ を最小改修で移行したい場合は SQS への移行が最適である。",
+   "answer": false,
+   "explain": "プロトコル互換の Amazon MQ が最適。"
+  },
+  {
+   "id": "ox-4-5-p3-c",
+   "lesson": "4-5",
+   "text": "Step Functions は複数の Lambda や AWS サービスをワークフローとしてオーケストレーションできる。",
+   "answer": true,
+   "explain": "標準機能。"
+  },
+  {
+   "id": "ox-4-5-p4-a",
+   "lesson": "4-5",
+   "text": "M2 の Replatform パターンでは、COBOL をほぼ変更せずに互換ランタイムで実行できる。",
+   "answer": true,
+   "explain": "改修最小。"
+  },
+  {
+   "id": "ox-4-5-p4-b",
+   "lesson": "4-5",
+   "text": "M2 の Automated Refactor は COBOL を Python に変換する。",
+   "answer": false,
+   "explain": "Java へ変換。"
+  },
+  {
+   "id": "ox-4-5-p4-c",
+   "lesson": "4-5",
+   "text": "メインフレーム移行では、ハードウェアや MIPS ベースの保守費削減がよくある動機である。",
+   "answer": true,
+   "explain": "コスト削減が主な動機の一つ。"
+  },
+  {
+   "id": "ox-4-6-p1-a",
+   "lesson": "4-6",
+   "text": "Dedicated Host は、ソケットやコア数が可視化されるため、ソケット/コア単位の BYOL に利用できる。",
+   "answer": true,
+   "explain": "Dedicated Instance との違い。"
+  },
+  {
+   "id": "ox-4-6-p1-b",
+   "lesson": "4-6",
+   "text": "Amazon RDS for SQL Server では、通常のインスタンスで BYOL を選択できる。",
+   "answer": false,
+   "explain": "標準の RDS for SQL Server は License Included のみ。"
+  },
+  {
+   "id": "ox-4-6-p1-c",
+   "lesson": "4-6",
+   "text": "AWS License Manager は組織全体でライセンス使用量の追跡と制限に使える。",
+   "answer": true,
+   "explain": "Organizations 連携で管理。"
+  },
+  {
+   "id": "ox-4-6-p2-a",
+   "lesson": "4-6",
+   "text": "Savings Plans の購入前に、まずライトサイジングを行うのが望ましい。",
+   "answer": true,
+   "explain": "過大スペックのままコミットしないため。"
+  },
+  {
+   "id": "ox-4-6-p2-b",
+   "lesson": "4-6",
+   "text": "AWS へのデータのインバウンド転送には課金されるが、アウトバウンドは無料である。",
+   "answer": false,
+   "explain": "逆。インバウンドは無料、アウトバウンドは有料。"
+  },
+  {
+   "id": "ox-4-6-p2-c",
+   "lesson": "4-6",
+   "text": "Migration Evaluator は既存環境の利用状況に基づいてビジネスケースを作る。",
+   "answer": true,
+   "explain": "エージェントレスコレクターで収集。"
+  },
+  {
+   "id": "ox-4-6-p3-a",
+   "lesson": "4-6",
+   "text": "依存関係の詳細な把握が必要な場合は、ADS のエージェントレス方式だけで十分である。",
+   "answer": false,
+   "explain": "エージェント方式でプロセス・ネットワーク接続を取得する。"
+  },
+  {
+   "id": "ox-4-6-p3-b",
+   "lesson": "4-6",
+   "text": "異種 DB 移行では、スキーマ変換とデータ移行を別ツールで行うのが一般的である。",
+   "answer": true,
+   "explain": "SCT + DMS。"
+  },
+  {
+   "id": "ox-4-6-p3-c",
+   "lesson": "4-6",
+   "text": "カットオーバー前にロールバック計画を準備しておくことは重要である。",
+   "answer": true,
+   "explain": "移行失敗時に備える。"
+  }
+ ],
+ "mc": [
+  {
+   "id": "mc-4-001",
+   "stem": "ある製造業の企業は、2 か月後にオンプレミスのデータセンターのリース契約が終了します。環境には約 400 台の Windows/Linux 物理および仮想サーバーがあり、アプリケーションのソースコードは外部ベンダー保有で改修できません。ソリューションアーキテクトは、サーバーを最小のダウンタイムで AWS に移行し、移行状況を一元的に把握したいと考えています。最も運用効率が高い方法はどれですか。",
+   "items": [],
+   "choices": [
+    "AWS Application Migration Service (MGN) にレプリケーションエージェントを導入して継続的にレプリケーションし、テストカットオーバー後に本番カットオーバーを行う。進捗は Migration Hub で追跡する。",
+    "AWS Snowball Edge に全サーバーのディスクイメージをコピーして S3 に取り込み、手動で復元する。",
+    "各アプリケーションを AWS Lambda に再設計してから移行する。",
+    "サーバーごとに VM Import/Export で AMI を作成し、手動で EC2 を起動する。"
+   ],
+   "explain": [
+    "正解。MGN はブロックレベルの継続レプリケーションでカットオーバー時間を数分に抑え、テストカットオーバーも可能。Migration Hub で進捗を一元管理できる。",
+    "Snow はデータ転送用でサーバー移行ツールではなく、復元作業も手動で非効率。",
+    "ソースコード改修不可・期限 2 か月の要件に反する(Refactor は不可)。",
+    "VM Import/Export は継続同期がなく、400 台の手作業は非効率でダウンタイムも長い。"
+   ],
+   "tip": "『変更不可+短期+サーバー』なら Rehost=MGN。Refactor 系の選択肢は即除外。",
+   "domain": 4,
+   "answer": 1
+  },
+  {
+   "id": "mc-4-002",
+   "stem": "ある企業は、オンプレミスの Oracle データベース(2TB)を Amazon Aurora PostgreSQL に移行します。業務上、停止できる時間は最大 30 分です。データベースにはストアドプロシージャが多数あり、アプリケーションには SQL が埋め込まれています。どの手順の組み合わせが最適ですか。",
+   "items": [],
+   "choices": [
+    "DMS のみで full load を行い、ストアドプロシージャは自動的に変換される。",
+    "Aurora PostgreSQL のリードレプリカとして Oracle をレプリケートする。",
+    "Oracle Data Pump でエクスポートし、Aurora PostgreSQL に直接インポートする。",
+    "AWS SCT で評価レポートを作成しスキーマとコードを変換した後、AWS DMS の full load + CDC で移行し、同期後にカットオーバーする。"
+   ],
+   "explain": [
+    "DMS はスキーマ変換を完全には行わない。",
+    "Aurora のレプリカ元になれるのは同種の RDS/Aurora で、オンプレ Oracle は不可。",
+    "Data Pump は Oracle 同士のフォーマットで PostgreSQL に直接インポートできない。",
+    "正解。異種移行は SCT でスキーマ/コードを変換し、DMS の CDC で停止時間を最小化する。"
+   ],
+   "tip": "異種 DB=SCT(スキーマ)+DMS(データ)。ダウンタイム短縮=CDC。",
+   "domain": 4,
+   "answer": 4
+  },
+  {
+   "id": "mc-4-003",
+   "stem": "ある小売企業は、オンプレミスのファイルサーバー(NFS)にある 150TB のデータを Amazon S3 に移行します。インターネット回線は 200Mbps で業務と共用され、利用できるのは約半分です。移行は 6 週間以内に完了する必要があります。移行後も 1 か月間は新規ファイルの変更が発生します。最もコスト効率が高く要件を満たす方法はどれですか。",
+   "items": [],
+   "choices": [
+    "S3 Transfer Acceleration を有効化し、AWS CLI で並列アップロードする。",
+    "Snowball Edge で初期データをコピーして S3 に取り込み、その後 DataSync で差分を同期する。",
+    "DataSync エージェントのみを使用し、ネットワーク経由で全データを転送する。",
+    "Direct Connect を新規契約し、DataSync で転送する。"
+   ],
+   "explain": [
+    "帯域そのものがボトルネックなので、アクセラレーションでも解決しない。",
+    "正解。初期転送をオフライン化し、変更分のみ DataSync で追い付ける。",
+    "100Mbps で 150TB は約 140 日かかり、6 週間に収まらない。",
+    "開通までの時間とコストの面で不利。6 週間で間に合わない可能性が高い。"
+   ],
+   "tip": "必ず所要日数を計算。足りなければ Snow、差分は DataSync。",
+   "domain": 4,
+   "answer": 2
+  },
+  {
+   "id": "mc-4-004",
+   "stem": "ある企業は、VMware vSphere 上で稼働する 600 台の VM を AWS に移行します。運用チームは vCenter を使った既存の運用手順・ツール・IP アドレスを変更したくありません。移行は数週間以内に完了させたい。最適な移行先と手段はどれですか。",
+   "items": [],
+   "choices": [
+    "VM 内のアプリを Amazon ECS にコンテナ化して移行する。",
+    "VMware Cloud on AWS に HCX を使って VM を移行する。",
+    "VM を OVA にエクスポートし、VM Import/Export で AMI 化する。",
+    "AWS MGN で各 VM を EC2 に変換する。"
+   ],
+   "explain": [
+    "再設計が必要で数週間では難しい。",
+    "正解。Relocate 戦略。同一の VMware 運用と IP 維持(L2 拡張)が可能。",
+    "同様に運用手順が変わり、継続同期もない。",
+    "EC2 への変換は運用手順・ハイパーバイザーが変わる。"
+   ],
+   "tip": "『VMware 運用を変えない』=VMware Cloud on AWS(Relocate)。",
+   "domain": 4,
+   "answer": 2
+  },
+  {
+   "id": "mc-4-005",
+   "stem": "ある金融企業は、オンプレミスの SQL Server データベースを AWS に移行します。アプリケーションは .NET で書かれ、T-SQL を多用しています。ライセンス費用を削減したいが、アプリの改修は最小にしたい。最適な選択肢はどれですか。",
+   "items": [],
+   "choices": [
+    "Amazon RDS for SQL Server に移行する。",
+    "Amazon DocumentDB に移行する。",
+    "Aurora PostgreSQL に移行し、Babelfish for Aurora PostgreSQL を有効化する。DMS でデータ移行する。",
+    "DynamoDB にすべて移行する。"
+   ],
+   "explain": [
+    "ライセンス費用(License Included)の削減にならない。",
+    "ドキュメント DB は用途が異なり改修が大きい。",
+    "正解。Babelfish により T-SQL/TDS をほぼそのまま利用でき、商用ライセンスを削減できる。",
+    "大規模な再設計が必要でアプリ改修が大きい。"
+   ],
+   "tip": "『SQL Server+ライセンス削減+改修最小』→ Babelfish。",
+   "domain": 4,
+   "answer": 3
+  },
+  {
+   "id": "mc-4-006",
+   "stem": "あるメディア企業は、オンプレミスのレガシーな Java Web アプリケーション(Tomcat)をコンテナ化したいと考えています。ソースコードは変更したくなく、自動で Dockerfile などを生成し ECS にデプロイしたい。最も適したのはどれですか。",
+   "items": [],
+   "choices": [
+    "Elastic Beanstalk の Docker プラットフォームに手動でイメージを作成する。",
+    "AWS SAM で再設計する。",
+    "AWS Lambda に移植する。",
+    "AWS App2Container で分析・コンテナ化し、ECR と ECS/Fargate にデプロイする。"
+   ],
+   "explain": [
+    "可能だが自動化されない。",
+    "サーバーレスへの再設計が必要。",
+    "再設計が必要。",
+    "正解。A2C は Java/.NET アプリを分析しコンテナ成果物を自動生成する。"
+   ],
+   "tip": "『コンテナ化+コード変更なし+自動生成』=App2Container。",
+   "domain": 4,
+   "answer": 4
+  },
+  {
+   "id": "mc-4-007",
+   "stem": "ある保険会社は、COBOL で記述されたメインフレームの基幹アプリケーションを AWS に移行します。短期間・低リスクで移行し、コードの大規模な変更は避けたい。将来的な Java 化は検討したい。最も適切なアプローチはどれですか。",
+   "items": [],
+   "choices": [
+    "AWS Mainframe Modernization の Replatform パターンで、COBOL を互換ランタイム上で実行し、後続フェーズで Automated Refactor を検討する。",
+    "ライセンスを維持するため、そのままオンプレに残す(Retain)。",
+    "EC2 にエミュレータを手作業で構築する。",
+    "すべての COBOL を手作業で Lambda に書き換える。"
+   ],
+   "explain": [
+    "正解。コードほぼ変更なしで移行でき、段階的にモダナイズできる。",
+    "移行要件に反する。",
+    "運用・可用性・保守が負担。",
+    "高コスト・高リスク。"
+   ],
+   "tip": "COBOL=M2。低リスク=Replatform、Java化=Automated Refactor。",
+   "domain": 4,
+   "answer": 1
+  },
+  {
+   "id": "mc-4-008",
+   "stem": "ある企業は、巨大なモノリシック Web アプリケーションを数年かけてマイクロサービス化する計画です。事業継続のため、サービスを停止することはできません。移行中も機能追加を続けます。最適な戦略はどれですか。",
+   "items": [],
+   "choices": [
+    "Strangler Fig パターンで、前段に API Gateway/ALB を置き、機能単位で新サービスにルーティングを切り替える。",
+    "新システムを一括開発し、週末に全面切替する。",
+    "モノリスを EC2 にそのまま移行して終了する。",
+    "新旧のデータベースを手動で同期し、全ユーザーを同時に移行する。"
+   ],
+   "explain": [
+    "正解。段階的でロールバック容易。",
+    "ビッグバンはリスクが高く、機能追加と並行しにくい。",
+    "モダナイズ要件を満たさない。",
+    "同時移行はリスクが高い。"
+   ],
+   "tip": "長期・無停止・並行開発=Strangler Fig。",
+   "domain": 4,
+   "answer": 1
+  },
+  {
+   "id": "mc-4-009",
+   "stem": "ある企業は、Oracle Database Enterprise Edition を Dedicated Host 上の EC2 で BYOL 運用しています。ライセンスはソケットベースで、オンプレミスと同数のソケット数に制限されています。AWS で複数アカウントにまたがるライセンスの使用状況を追跡し、超過を防止したい。どうすべきですか。",
+   "items": [],
+   "choices": [
+    "アカウントごとに別途スプレッドシートで管理する。",
+    "AWS License Manager でライセンスルールを作成し、AWS Organizations で共有・管理する。",
+    "Dedicated Instance を使用する。",
+    "AWS Config のみで監視する。"
+   ],
+   "explain": [
+    "手動で漏れやすい。",
+    "正解。ルールを強制(ホスト数・ソケット数)し、組織全体で追跡できる。",
+    "ソケット/コア可視化がなく BYOL に不十分。",
+    "ライセンス使用量の制限機能はない。"
+   ],
+   "tip": "BYOL+ソケット=Dedicated Host、管理=License Manager。",
+   "domain": 4,
+   "answer": 2
+  },
+  {
+   "id": "mc-4-010",
+   "stem": "ある企業のオンプレミス MySQL(500GB)を Amazon Aurora MySQL に移行します。ソースの MySQL は更新が続き、停止可能な時間は 10 分以内です。ネットワークは Direct Connect で接続済みです。最適な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "mysqldump でエクスポートし、Aurora にインポートする。",
+    "Aurora Serverless に切り替える。",
+    "スナップショットを S3 に出力して手動で復元する。",
+    "DMS で full load + CDC を実行し、同期が追いついた後に切り替える。"
+   ],
+   "explain": [
+    "書き出し・取り込み中の停止が長くなる。",
+    "移行手段ではない。",
+    "同期されない更新が失われる。",
+    "正解。更新を継続反映し、切替時間を最小化できる。"
+   ],
+   "tip": "更新継続+短い停止=CDC。",
+   "domain": 4,
+   "answer": 4
+  },
+  {
+   "id": "mc-4-011",
+   "stem": "ある企業は、オンラインゲームのプレイヤー状態データ(キーバリュー、1 日数十億リクエスト、ミリ秒応答)を、オンプレミスの MySQL から AWS に移行します。スキーマ変更は許容でき、運用負荷を最小にしたい。最適な移行先はどれですか。",
+   "items": [],
+   "choices": [
+    "Amazon DynamoDB(DMS のオブジェクトマッピング利用)",
+    "Amazon Redshift",
+    "Amazon RDS for MySQL",
+    "Amazon DocumentDB"
+   ],
+   "explain": [
+    "正解。キー検索・大規模・サーバーレス運用に適する。",
+    "OLAP 向けで低レイテンシトランザクション用途ではない。",
+    "スケール限界と運用負荷が残る。",
+    "MongoDB 互換が必要な場合に限る。"
+   ],
+   "tip": "キーバリュー+超大規模+ミリ秒=DynamoDB。",
+   "domain": 4,
+   "answer": 1
+  },
+  {
+   "id": "mc-4-012",
+   "stem": "ある企業は、アプリケーションの依存関係が不明な状態で 300 台のサーバーをクラウド移行します。VMware 環境と一部の物理サーバーが混在します。移行ウェーブを決めるため、サーバー間のネットワーク依存関係を把握する必要があります。最適な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "AWS Config を有効化する。",
+    "AWS Cost Explorer を使用する。",
+    "Agentless Collector のみを VMware にデプロイする。",
+    "AWS Application Discovery Service の Discovery Agent を導入する。"
+   ],
+   "explain": [
+    "AWS 内リソースの構成管理であり、オンプレ不可。",
+    "コスト分析で依存関係は分からない。",
+    "物理サーバーは対象外で、接続詳細も取得できない。",
+    "正解。エージェントはプロセスとネットワーク接続を取得し、物理サーバーにも導入できる。"
+   ],
+   "tip": "依存関係+物理混在=Discovery Agent。",
+   "domain": 4,
+   "answer": 4
+  },
+  {
+   "id": "mc-4-013",
+   "stem": "ある企業は、経営層に対しクラウド移行の費用対効果を示す必要があります。現状のオンプレミス環境の CPU・メモリ利用実績に基づいて、適正サイズの AWS 構成と TCO 比較を最短で作成したい。何を使いますか。",
+   "items": [],
+   "choices": [
+    "AWS Cost Explorer",
+    "AWS Migration Evaluator",
+    "AWS Budgets",
+    "AWS Pricing Calculator に手入力する"
+   ],
+   "explain": [
+    "AWS 利用実績が前提。",
+    "正解。実測データからビジネスケースを作成する。",
+    "予算アラート用。",
+    "手入力は実測に基づかず工数が大きい。"
+   ],
+   "tip": "実績に基づく TCO=Migration Evaluator。",
+   "domain": 4,
+   "answer": 2
+  },
+  {
+   "id": "mc-4-014",
+   "stem": "ある企業は、SFTP でパートナー企業からファイルを受領しており、現在はオンプレミスの SFTP サーバーを運用しています。パートナーの設定を変更せずに、受領ファイルを S3 に保存し、運用負荷を減らしたい。最適な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "AWS DataSync を使う。",
+    "S3 パブリックバケットにアップロードさせる。",
+    "AWS Transfer Family の SFTP サーバー(S3 バックエンド)を使う。",
+    "EC2 に SFTP サーバーを構築する。"
+   ],
+   "explain": [
+    "プロトコル受付の用途ではない。",
+    "セキュリティと互換性の問題。",
+    "正解。マネージドで既存クライアントがそのまま使える。",
+    "運用負荷が残る。"
+   ],
+   "tip": "外部パートナーの SFTP=Transfer Family。",
+   "domain": 4,
+   "answer": 3
+  },
+  {
+   "id": "mc-4-015",
+   "stem": "ある企業は、オンプレミスのバックアップソフトウェアでテープライブラリにバックアップしています。バックアップソフトウェアと運用手順は変更せず、物理テープの保管コストと管理負荷を削減するため、物理テープを廃止して AWS に長期保管したいと考えています。最も適切な構成はどれですか。",
+   "items": [],
+   "choices": [
+    "S3 File Gateway",
+    "DataSync",
+    "Storage Gateway の Tape Gateway",
+    "Volume Gateway(Cached)"
+   ],
+   "explain": [
+    "ファイル共有用でテープ互換ではない。",
+    "VTL をサポートしない。",
+    "正解。VTL として S3/Glacier にテープを保存する。",
+    "ブロックボリューム用。"
+   ],
+   "tip": "テープ廃止=Tape Gateway。",
+   "domain": 4,
+   "answer": 3
+  },
+  {
+   "id": "mc-4-016",
+   "stem": "ある企業は、オンプレミス SQL Server の移行で、RDS for SQL Server を使いたいと考えています。既存のライセンス(ソフトウェアアシュアランス付き)を持ち込みたく、特に Dedicated Host での運用を想定しています。標準の RDS for SQL Server の制約を踏まえて、最適な選択肢はどれですか。",
+   "items": [],
+   "choices": [
+    "Aurora MySQL に自動で変換される。",
+    "標準の RDS for SQL Server で BYOL を指定する。",
+    "EC2 上の SQL Server(Dedicated Host)、または RDS Custom for SQL Server を検討する。",
+    "DynamoDB に移行する。"
+   ],
+   "explain": [
+    "自動変換はない。",
+    "標準 RDS for SQL Server は License Included のみ。",
+    "正解。BYOL が必要な場合の現実的な選択肢。",
+    "大規模改修が必要。"
+   ],
+   "tip": "RDS for SQL Server=LI のみ。BYOL なら EC2 または RDS Custom。",
+   "domain": 4,
+   "answer": 3
+  },
+  {
+   "id": "mc-4-017",
+   "stem": "ある企業は、移行後の AWS 環境でマルチアカウント戦略を採用します。開発・本番アカウントを自動で払い出し、セキュリティログを集約し、特定リージョンの利用を禁止するなどのガードレールを最小の運用負荷で適用したい。最適な方法はどれですか。",
+   "items": [],
+   "choices": [
+    "各アカウントを手動で作成し IAM ポリシーを個別に設定する。",
+    "単一アカウントに環境ごとの VPC を作成する。",
+    "CloudFormation StackSets だけで構成する。",
+    "AWS Control Tower でランディングゾーンを構築し、Account Factory と SCP ベースのコントロールを使用する。"
+   ],
+   "explain": [
+    "運用負荷が大きく一貫性が保てない。",
+    "アカウント分離になっていない。",
+    "ガードレール・ログ集約まで自動化されない。",
+    "正解。Control Tower はマルチアカウント基盤とガードレールを提供する。"
+   ],
+   "tip": "ランディングゾーン=Control Tower。リージョン拒否は SCP。",
+   "domain": 4,
+   "answer": 4
+  },
+  {
+   "id": "mc-4-018",
+   "stem": "ある企業は、オンプレミスと AWS を新規に構築する Direct Connect で接続し、1 日あたり 5TB を継続的に S3 へ転送します。データはインターネットを経由させず、プライベートに S3 へ到達させる必要があります。最適な構成はどれですか。",
+   "items": [],
+   "choices": [
+    "インターネット経由で転送する。",
+    "Site-to-Site VPN を使用する。",
+    "Direct Connect に Private VIF を作成し、VPC の S3 インターフェイスエンドポイントを利用する。",
+    "Public VIF のみを使用する。"
+   ],
+   "explain": [
+    "要件に反する。",
+    "大量転送には帯域が不安定。",
+    "正解。オンプレミスからのプライベート接続では S3 インターフェイスエンドポイント(PrivateLink)が使える。",
+    "Public VIF は AWS のパブリックエンドポイント経由(インターネットは通らないが VPC 内プライベートではない)。要件に対して不適。"
+   ],
+   "tip": "オンプレから S3 をプライベート=Private VIF+インターフェイスエンドポイント。",
+   "domain": 4,
+   "answer": 3
+  },
+  {
+   "id": "mc-4-019",
+   "stem": "ある企業は、既存の RabbitMQ メッセージブローカーを使うアプリケーションを AWS に移行します。AMQP クライアントコードを変更したくなく、ブローカーのパッチ適用やクラスター運用などの運用負荷も下げ、高可用性も確保したいと考えています。最も適切な選択肢はどれですか。",
+   "items": [],
+   "choices": [
+    "Amazon MQ for RabbitMQ",
+    "Amazon Kinesis",
+    "Amazon EventBridge",
+    "Amazon SQS"
+   ],
+   "explain": [
+    "正解。プロトコル互換のマネージド。",
+    "ストリーミング用。",
+    "イベントバス用。",
+    "API が異なりコード変更が必要。"
+   ],
+   "tip": "ブローカー互換移行=Amazon MQ。",
+   "domain": 4,
+   "answer": 1
+  },
+  {
+   "id": "mc-4-020",
+   "stem": "ある企業は、オンプレミスの Hadoop クラスターとデータウェアハウス(Teradata)を AWS に移行し、分析基盤をモダナイズします。DWH は 80TB、回線は 1Gbps で限られます。スキーマ変換を含め、最適な構成はどれですか。",
+   "items": [],
+   "choices": [
+    "S3 に手動でコピーし、Redshift で手作業でテーブルを作る。",
+    "SCT でスキーマを Redshift に変換し、データ抽出エージェントと Snowball Edge で初期ロード、DMS で差分を同期する。",
+    "DMS のみで全データをインターネット経由で転送する。",
+    "Aurora に移行する。"
+   ],
+   "explain": [
+    "工数大。",
+    "正解。SCT+Snow+DMS が DWH 移行の定番。",
+    "時間がかかり、スキーマ変換もできない。",
+    "OLAP に不適。"
+   ],
+   "tip": "DWH 大容量=SCT のデータ抽出エージェント+Snowball。",
+   "domain": 4,
+   "answer": 2
+  },
+  {
+   "id": "mc-4-021",
+   "stem": "ある企業は、オンプレミスの Oracle データベース(5TB、更新頻度が高い)を Amazon Aurora PostgreSQL に移行します。停止時間は最小にしたく、アプリケーションには埋め込み SQL が多数あります。移行計画に含めるべき手順を 2 つ選択してください。",
+   "items": [],
+   "choices": [
+    "AWS SCT で評価レポートを作成し、スキーマとアプリケーション SQL を変換する。",
+    "AWS DMS で full load + CDC のタスクを作成し、同期完了後にカットオーバーする。",
+    "Oracle の RMAN バックアップを Aurora に直接リストアする。",
+    "DynamoDB Accelerator (DAX) を前段に配置する。",
+    "AWS DataSync でデータファイルを S3 にコピーし、Aurora に直接アタッチする。"
+   ],
+   "explain": [
+    "正解。変換難易度の把握と変換を行う。",
+    "正解。更新を継続反映して停止時間を最小化する。",
+    "異種エンジンのためリストアできない。",
+    "DAX は DynamoDB 用でありここでは無関係。",
+    "Aurora にデータファイルをアタッチする機能はない。"
+   ],
+   "tip": "異種 DB は『変換(SCT)+複製(DMS)』の 2 本立て。",
+   "domain": 4,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-4-022",
+   "stem": "ある企業は、1PB のデータをオンプレミスから S3 に移行します。回線は 1Gbps、期限は 3 週間です。移行中も一部のデータは更新されます。要件を満たす構成を 2 つ選択してください。",
+   "items": [],
+   "choices": [
+    "複数台の Snowball Edge で初期データを転送する。",
+    "Snowball 輸送後、DataSync で更新分を同期する。",
+    "Site-to-Site VPN を増設して 1PB を転送する。",
+    "S3 Transfer Acceleration をすべてのデータに使用する。",
+    "Snowmobile を新規で利用する。"
+   ],
+   "explain": [
+    "正解。1PB は 1Gbps で約 93 日かかるためオフライン転送が必要。",
+    "正解。差分を同期できる。",
+    "VPN の帯域は 1Gbps を超えない。",
+    "回線帯域がボトルネックで解決しない。",
+    "Snowmobile は提供終了。"
+   ],
+   "tip": "1PB/1Gbps≒約 93 日。期限と比較して Snow を選ぶ。",
+   "domain": 4,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-4-023",
+   "stem": "ある企業は、ライセンスコストを抑えつつ Windows Server と SQL Server を EC2 で運用します。ソフトウェアアシュアランス付きの既存ライセンスを活用し、ソケット/コア単位の管理が必要です。適切な対策を 2 つ選択してください。",
+   "items": [],
+   "choices": [
+    "Dedicated Host を使用してコア/ソケットを可視化する。",
+    "AWS License Manager でホスト・ライセンスのルールを管理する。",
+    "Dedicated Instance を使用して BYOL を行う。",
+    "RDS for SQL Server に移行して BYOL を使用する。",
+    "スポットインスタンスで運用する。"
+   ],
+   "explain": [
+    "正解。ソケット/コアベースの BYOL に必要。",
+    "正解。使用状況の追跡・制限ができる。",
+    "ソケットが可視化されないため不十分。",
+    "標準 RDS for SQL Server は BYOL 不可。",
+    "ライセンス要件の充足とは無関係。"
+   ],
+   "tip": "BYOL(物理コア/ソケット)=Dedicated Host+License Manager。",
+   "domain": 4,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-4-024",
+   "stem": "ある企業は、monolithic な .NET アプリをモダナイズします。短期間でコンテナ化し、その後に機能を段階的に分離していく計画です。適切なアプローチを 2 つ選択してください。",
+   "items": [],
+   "choices": [
+    "AWS App2Container でコンテナ化し ECS にデプロイする。",
+    "Migration Hub Refactor Spaces と ALB を使い、機能単位で新サービスに切り替える。",
+    "すべてを一度に Lambda に書き直す。",
+    "Snowball Edge にアプリを載せる。",
+    "コンテナ化せず手動で EC2 に再インストールする。"
+   ],
+   "explain": [
+    "正解。.NET を最小改修でコンテナ化。",
+    "正解。Strangler Fig による段階移行。",
+    "ビッグバンでリスク大。",
+    "アプリ移行手段ではない。",
+    "モダナイズ要件に反する。"
+   ],
+   "tip": "コンテナ化(A2C)→段階分離(Strangler Fig)の順。",
+   "domain": 4,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-4-025",
+   "stem": "ある企業は、VMware 上の 300 台の VM を AWS に移行します。一部のアプリは変更不可でオンプレと同じ IP が必要、残りの Windows アプリは EC2 へ移し VMware ライセンスから脱却したい。適切な組み合わせを 3 つ選択してください。",
+   "items": [],
+   "choices": [
+    "変更不可のアプリは VMware Cloud on AWS へ HCX で移行する。",
+    "ライセンス脱却対象のアプリは MGN で EC2 へ移行する。",
+    "全体の依存関係把握に Application Discovery Service を使用する。",
+    "すべての VM を Snowball Edge に保存して移送する。",
+    "すべての VM を Lambda に変換する。"
+   ],
+   "explain": [
+    "正解。Relocate。",
+    "正解。Rehost。",
+    "正解。ウェーブ計画に必要。",
+    "Snow は移行手段として不適。",
+    "変換不可。"
+   ],
+   "tip": "アプリごとに 7R を使い分ける。複数選択でも要件ごとの分割が鍵。",
+   "domain": 4,
+   "answers": [
+    1,
+    2,
+    3
+   ],
+   "select": 3
+  },
+  {
+   "id": "mc-4-026",
+   "stem": "ある企業は、オンプレミスの NFS 上の 80TB を Amazon S3 と Amazon EFS に移行します。権限メタデータを保持し、整合性を検証し、業務時間中は帯域を制限したい。適切な設計を 2 つ選択してください。",
+   "items": [],
+   "choices": [
+    "DataSync エージェントをオンプレに配置し、帯域制限とスケジュールを設定する。",
+    "DataSync のタスクで整合性検証を有効化する。",
+    "Storage Gateway の Tape Gateway を使用する。",
+    "Transfer Family の FTP を使用する。",
+    "AWS DMS を使用する。"
+   ],
+   "explain": [
+    "正解。",
+    "正解。",
+    "テープ用。",
+    "プロトコル受付用で移行向きではない。",
+    "DB 用。"
+   ],
+   "tip": "ファイル移行+帯域制御=DataSync。",
+   "domain": 4,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  },
+  {
+   "id": "mc-4-027",
+   "stem": "ある企業は、メインフレームの COBOL アプリと DB2 データを AWS に移行します。早期にハードウェア保守費を削減し、コードはほぼ変更しないこと、データはリレーショナル DB に移すことを要件とします。適切なアプローチを 2 つ選択してください。",
+   "items": [],
+   "choices": [
+    "AWS Mainframe Modernization の Replatform パターンを使用する。",
+    "DMS などで DB2 のデータを Aurora/RDS に移行する。",
+    "EC2 に手作業でエミュレータを構築する。",
+    "COBOL を自動で Python に変換する。",
+    "メインフレームを Retain として残す。"
+   ],
+   "explain": [
+    "正解。",
+    "正解。",
+    "運用負荷が大きい。",
+    "Automated Refactor は Java への変換で Python ではない。",
+    "保守費削減の要件に反する。"
+   ],
+   "tip": "M2 は Replatform=ほぼそのまま、Refactor=Java。",
+   "domain": 4,
+   "answers": [
+    1,
+    2
+   ],
+   "select": 2
+  }
+ ]
+}
